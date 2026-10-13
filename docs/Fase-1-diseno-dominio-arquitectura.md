@@ -137,7 +137,7 @@ reportes/
 
 La estructura final de paquetes se decidirá al preparar el proyecto. La organización no será suficiente por sí sola: las dependencias deben apuntar hacia dominio y aplicación, y los adaptadores implementan los puertos.
 
-## 10. Decisiones pendientes antes de diseñar la base de datos
+## 10. Reglas que podrán precisarse al implementar
 
 - ¿El proveedor recibe acceso al nuevo negocio de inmediato al transferirse, o la transferencia requiere aceptación del nuevo negocio?
 - ¿Cómo se calcula el día facturable: días calendario, bloques de 24 horas o regla de hora de corte? ¿Se permiten períodos parciales?
@@ -153,9 +153,17 @@ La estructura final de paquetes se decidirá al preparar el proyecto. La organiz
 - Confirmado: los daños requieren evidencia; quien hizo la entrega debe notificar a sus superiores. Pendiente definir quién resuelve el monto de retención y si puede superar el depósito.
 - Confirmado: una transferencia requiere un período de espera mientras ambos negocios acuerdan. Pendiente definir duración, aprobadores y acceso del proveedor durante la espera.
 
+### Interpretaciones provisionales aceptadas
+
+- Se cuentan las fechas de inicio y devolución; el período se expresa por fechas calendario. Si luego se requieren fracciones de día, se ajustará la regla.
+- Al cancelar antes de la entrega, el depósito se devuelve completo y la regla 100%/90% se aplica al cobro de renta. Exactamente 24 horas antes se considera dentro del reembolso completo.
+- La persona que hizo la entrega reporta el daño con evidencia; un superior revisa y fija la retención, limitada al depósito.
+- Mientras una transferencia está pendiente, el proveedor sigue asignado al negocio actual. La nueva asignación y permisos comienzan al aprobarse el acuerdo.
+- Estas reglas son la base inicial y pueden cambiar si aparece un requisito académico o de negocio.
+
 ## 11. Progreso
 
-- **Fase actual:** Fase 1, diseño del dominio y arquitectura.
-- **Completado hoy:** conceptos, módulos, agregados iniciales, estados, invariantes, casos de uso y puertos/adaptadores propuestos; reglas iniciales para días calendario, cancelaciones, evidencia de daños y transferencias pendientes.
-- **Pendiente:** resolver políticas de negocio, validar agregados y definir el modelo relacional/normalización en Fase 2.
+- **Fase actual:** Fase 2, diseño de base de datos y normalización.
+- **Completado:** propuesta inicial de conceptos, módulos, agregados, estados, invariantes, casos de uso, puertos/adaptadores y reglas para días calendario, cancelaciones, evidencia de daños y transferencias pendientes.
+- **Pendiente:** validar el modelo relacional y la normalización propuestos en `Fase-2-modelo-relacional-y-normalizacion.md`; después crear SQL y datos semilla.
 - **Código y pruebas:** aún no iniciados.
