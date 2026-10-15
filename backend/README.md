@@ -22,6 +22,12 @@ Con MySQL activo, carga las variables del `.env` raíz en PowerShell y ejecuta `
 
 El endpoint de salud es una herramienta operativa de Spring Actuator, no una función de negocio. Está permitido sin autenticación para facilitar la comprobación local; el resto de rutas requiere autenticación HTTP Basic temporal hasta implementar JWT.
 
+## Primer caso de uso: consultar el catálogo
+
+`GET /api/v1/catalog/equipment` devuelve equipos cuyo estado operativo es `AVAILABLE`, cuyo negocio está activo y que tienen una tarifa vigente hoy. La tarifa incluye el precio diario, el depósito y la moneda. Esta consulta no confirma disponibilidad para fechas concretas; eso se implementará en el flujo de reservas.
+
+La ruta está separada en un adaptador web, un caso de uso, un puerto de salida y un adaptador de persistencia. La consulta usa Spring Data JPA con SQL nativo porque el catálogo combina cuatro tablas; la proyección evita cargar entidades completas que la respuesta no necesita.
+
 ## Arquitectura
 
 El paquete base solo contiene el punto de entrada de Spring Boot. Los módulos de negocio se añadirán por contexto (`identity`, `businesses`, `catalog`, `rentals`, `payments` y `reports`), separando dominio y aplicación de los adaptadores web y de persistencia. Así las reglas de negocio no dependerán de Spring MVC ni de JPA.
