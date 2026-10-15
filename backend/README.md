@@ -60,6 +60,15 @@ Ejemplo de solicitud:
 
 En este corte `CONFIRMED` representa una reserva de demostración. Los importes de reembolso se calculan y la cancelación queda registrada, pero no se realiza un pago ni un reembolso real y no se integra una pasarela; ese paso debe completarse antes de tratar la API como un sistema de renta en producción. La verificación y creación se ejecutan en una transacción con bloqueo del equipo para evitar que dos solicitudes simultáneas lo reserven en fechas que se cruzan.
 
+## Entrega y devolución
+
+Estas rutas requieren un JWT con rol `PROVEEDOR` y el proveedor debe tener una asignación vigente al negocio de la reserva:
+
+- `POST /api/v1/rentals/{reservationId}/handover` registra quién entrega el equipo y cambia la reserva a `IN_RENTAL`.
+- `POST /api/v1/rentals/{reservationId}/return` recibe `{"condition":"GOOD"}`, `{"condition":"PARTIAL_DAMAGE"}` o `{"condition":"TOTAL_DAMAGE"}`. Registra quién recibe el equipo, cambia la reserva a `COMPLETED` y crea un reporte de daño cuando corresponde.
+
+La respuesta indica `DEPOSIT_REFUND_PENDING` para un equipo en buen estado y `DAMAGE_REVIEW_PENDING` cuando hay daño. El siguiente bloque será adjuntar evidencias y aprobar el monto retenido antes de generar el reembolso del depósito.
+
 ## Arquitectura
 
 El paquete base solo contiene el punto de entrada de Spring Boot. Los módulos de negocio se añadirán por contexto (`identity`, `businesses`, `catalog`, `rentals`, `payments` y `reports`), separando dominio y aplicación de los adaptadores web y de persistencia. Así las reglas de negocio no dependerán de Spring MVC ni de JPA.

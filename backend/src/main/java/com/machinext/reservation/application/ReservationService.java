@@ -134,9 +134,84 @@ public class ReservationService {
         return new CancellationResponse(reservationId, "CANCELLED", refundPercent, refundAmount, reservation.currency());
     }
 
+    @Transactional
+    public RentalLifecycleResponse handOver(long providerId, long reservationId) {
+        List<RentalData> rows = findRental(reservationId);
+        if (rows.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No existe esa reserva");
+        }
+        RentalData reservation = rows.getFirst();
+        if (!"CONFIRMED".equals(reservation.status())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Solo se puede entregar una reserva confirmada");
+        }
+        if (providerAssignmentDoesNotMatch(providerId, reservation.businessId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "El proveedor no está asignado a este negocio");
+        }
+        LocalDateTime handedOverAt = LocalDateTime.now();
+        jdbc.update("INSERT INTO rental (reservation_item_id, handed_over_by_user_id, handed_over_at) VALUES (?, ?, ?)",
+                reservation.itemId(), providerId, handedOverAt);
+        jdbc.update("UPDATE reservation SET status = 'IN_RENTAL' WHERE reservation_id = ?", reservationId);
+        return new RentalLifecycleResponse(reservationId, "IN_RENTAL", handedOverAt, null, null, null);
+    }
+
+    @Transactional
+    public RentalLifecycleResponse returnRental(long providerId, long reservationId, String condition) {
+        if (!List.of("GOOD", "PARTIAL_DAMAGE", "TOTAL_DAMAGE").contains(condition)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La condición debe ser GOOD, PARTIAL_DAMAGE o TOTAL_DAMAGE");
+        }
+        List<RentalData> rows = jdbc.query("""
+                SELECT r.status, r.business_id, ri.reservation_item_id, re.rental_id
+                FROM reservation r
+                JOIN reservation_item ri ON ri.reservation_id = r.reservation_id
+                JOIN rental re ON re.reservation_item_id = ri.reservation_item_id
+                WHERE r.reservation_id = ? AND re.returned_at IS NULL
+                FOR UPDATE
+                """, (rs, rowNum) -> new RentalData(rs.getString("status"), rs.getLong("business_id"),
+                rs.getLong("reservation_item_id"), rs.getLong("rental_id")), reservationId);
+        if (rows.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No existe un alquiler activo para esa reserva");
+        }
+        RentalData rental = rows.getFirst();
+        if (!"IN_RENTAL".equals(rental.status())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "La reserva no está en estado de alquiler");
+        }
+        if (providerAssignmentDoesNotMatch(providerId, rental.businessId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "El proveedor no está asignado a este negocio");
+        }
+        LocalDateTime returnedAt = LocalDateTime.now();
+        jdbc.update("UPDATE rental SET returned_to_user_id = ?, returned_at = ?, return_condition = ? WHERE rental_id = ?",
+                providerId, returnedAt, condition, rental.rentalId());
+        jdbc.update("UPDATE reservation SET status = 'COMPLETED' WHERE reservation_id = ?", reservationId);
+        if (!"GOOD".equals(condition)) {
+            jdbc.update("INSERT INTO damage_report (rental_id, reported_by_user_id, status) VALUES (?, ?, 'REPORTED')",
+                    rental.rentalId(), providerId);
+        }
+        return new RentalLifecycleResponse(reservationId, "COMPLETED", null, returnedAt, condition,
+                "GOOD".equals(condition) ? "DEPOSIT_REFUND_PENDING" : "DAMAGE_REVIEW_PENDING");
+    }
+
+    private List<RentalData> findRental(long reservationId) {
+        return jdbc.query("""
+                SELECT r.status, r.business_id, ri.reservation_item_id
+                FROM reservation r JOIN reservation_item ri ON ri.reservation_id = r.reservation_id
+                WHERE r.reservation_id = ?
+                FOR UPDATE
+                """, (rs, rowNum) -> new RentalData(rs.getString("status"), rs.getLong("business_id"),
+                rs.getLong("reservation_item_id"), null), reservationId);
+    }
+
+    private boolean providerAssignmentDoesNotMatch(long providerId, long businessId) {
+        Integer count = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM provider_assignment
+                WHERE provider_user_id = ? AND business_id = ? AND ended_at IS NULL
+                """, Integer.class, providerId, businessId);
+        return count == null || count == 0;
+    }
+
     private record Rate(long businessId, long rateId, BigDecimal dailyAmount, BigDecimal depositAmount, String currency) { }
     private record CancellationData(String status, LocalDateTime scheduledStartAt,
                                     BigDecimal rentalAmount, BigDecimal depositAmount, String currency) { }
+    private record RentalData(String status, long businessId, long itemId, Long rentalId) { }
 
     public record ReservationResponse(long reservationId, long equipmentId, String status,
                                       LocalDate startDate, LocalDate returnDate, long calendarDays,
@@ -145,4 +220,8 @@ public class ReservationService {
 
     public record CancellationResponse(long reservationId, String status, int refundPercent,
                                        BigDecimal refundAmount, String currency) { }
+
+    public record RentalLifecycleResponse(long reservationId, String status,
+                                          LocalDateTime handedOverAt, LocalDateTime returnedAt,
+                                          String returnCondition, String depositAction) { }
 }
