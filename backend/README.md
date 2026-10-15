@@ -12,7 +12,7 @@ El entorno actual tiene JDK 25 y Maven 3.9.16. Maven compila el código para Jav
 
 ## Conexión a MySQL
 
-La aplicación lee `DB_HOST`, `DB_PORT`, `MYSQL_DATABASE`, `MYSQL_USER` y `MYSQL_PASSWORD` del entorno. Por defecto usa `localhost:3307`, porque en el equipo el puerto 3306 no está disponible. Si se cambia el puerto publicado en el `.env` raíz, configura `DB_PORT` con el mismo valor antes de iniciar el backend.
+La aplicación lee `DB_HOST`, `DB_PORT`, `MYSQL_DATABASE`, `MYSQL_USER` y `MYSQL_PASSWORD` del entorno. Por defecto usa `localhost:3307`, porque en el equipo el puerto 3306 no está disponible. Si se cambia el puerto publicado en el `.env` raíz, configura `DB_PORT` con el mismo valor antes de iniciar el backend. JWT usa `JWT_SECRET` (mínimo 32 bytes) y `JWT_TTL_MINUTES`; el valor predeterminado de `application.yml` es solo para desarrollo local.
 
 `ddl-auto: validate` hace que Hibernate compruebe el mapeo contra el esquema existente. El esquema se administra con los scripts SQL de `database/`; Hibernate no debe crearlo ni modificarlo.
 
@@ -20,7 +20,21 @@ La aplicación lee `DB_HOST`, `DB_PORT`, `MYSQL_DATABASE`, `MYSQL_USER` y `MYSQL
 
 Con MySQL activo, carga las variables del `.env` raíz en PowerShell y ejecuta `mvn spring-boot:run`. Luego abre `http://localhost:8080/actuator/health` o consulta la URL con `Invoke-RestMethod`. Una respuesta `{"status":"UP"}` confirma que la aplicación está activa y que el indicador de salud de MySQL puede conectarse. Si el puerto 8080 está ocupado, inicia la aplicación con `$env:SERVER_PORT = "8081"` y usa esa dirección.
 
-El endpoint de salud es una herramienta operativa de Spring Actuator, no una función de negocio. Está permitido sin autenticación para facilitar la comprobación local; el resto de rutas requiere autenticación HTTP Basic temporal hasta implementar JWT.
+El endpoint de salud es una herramienta operativa de Spring Actuator, no una función de negocio. Está permitido sin autenticación para facilitar la comprobación local.
+
+## Cuentas y autenticación
+
+- `POST /api/v1/auth/register` crea una cuenta activa con rol `CLIENTE` y devuelve un JWT.
+- `POST /api/v1/auth/login` valida correo y contraseña y devuelve un JWT.
+- Las contraseñas se guardan con BCrypt. Los tokens son Bearer, firmados con HS256 y duran 60 minutos por defecto.
+- Catálogo y salud son públicos. Las demás rutas requieren `Authorization: Bearer <accessToken>`.
+- El registro normal nunca permite elegir rol. Las cuentas de demostración inactivas no pueden iniciar sesión.
+
+Ejemplo de registro:
+
+```json
+{"email":"cliente@example.com","password":"una-clave-segura","displayName":"Cliente de prueba"}
+```
 
 ## Primer caso de uso: consultar el catálogo
 
