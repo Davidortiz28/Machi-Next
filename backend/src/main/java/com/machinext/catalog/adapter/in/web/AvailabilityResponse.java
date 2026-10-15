@@ -7,5 +7,5 @@ public record AvailabilityResponse(
         LocalDate startDate,
         LocalDate returnDate,
         long calendarDays,
-        List<EquipmentCatalogResponse> equipment) {
+        List<AvailableEquipmentResponse> equipment) {
 }

@@ -2,9 +2,11 @@ package com.machinext.catalog.adapter.in.web;
 
 import com.machinext.catalog.application.ListEquipmentCatalog;
 import com.machinext.catalog.application.FindAvailableEquipment;
+import com.machinext.catalog.domain.AvailableEquipment;
 import com.machinext.catalog.domain.CatalogItem;
 import com.machinext.catalog.domain.InvalidRentalPeriodException;
 import com.machinext.catalog.domain.RentalPeriod;
+import com.machinext.catalog.domain.RentalQuote;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -44,8 +46,8 @@ public class EquipmentCatalogController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate returnDate) {
         RentalPeriod period = new RentalPeriod(startDate, returnDate);
-        List<EquipmentCatalogResponse> equipment = findAvailableEquipment.execute(period).stream()
-                .map(this::toResponse)
+        List<AvailableEquipmentResponse> equipment = findAvailableEquipment.execute(period).stream()
+                .map(this::toAvailableResponse)
                 .toList();
         return new AvailabilityResponse(startDate, returnDate, period.calendarDaysInclusive(), equipment);
     }
@@ -67,5 +69,17 @@ public class EquipmentCatalogController {
                 item.dailyAmount(),
                 item.depositAmount(),
                 item.currency());
+    }
+
+    private AvailableEquipmentResponse toAvailableResponse(AvailableEquipment available) {
+        RentalQuote quote = available.quote();
+        return new AvailableEquipmentResponse(
+                toResponse(available.equipment()),
+                new RentalQuoteResponse(
+                        quote.calendarDays(),
+                        quote.dailyAmount(),
+                        quote.rentalAmount(),
+                        quote.depositAmount(),
+                        quote.currency()));
     }
 }
