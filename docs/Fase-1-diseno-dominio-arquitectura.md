@@ -166,5 +166,5 @@ La estructura final de paquetes se decidirá al preparar el proyecto. La organiz
 - **Fase actual:** Fase 2, diseño de base de datos y normalización.
 - **Completado:** propuesta inicial de conceptos, módulos, agregados, estados, invariantes, casos de uso, puertos/adaptadores y reglas para días calendario, cancelaciones, evidencia de daños y transferencias pendientes.
 - **Completado desde la puesta en marcha:** los scripts SQL y los datos semilla se ejecutaron al inicializar MySQL 8.4.11 en Docker; los registros de MySQL confirman que ambos scripts terminaron sin errores.
-- **Código:** el esqueleto Maven compila para Java 21. El primer caso de uso del catálogo ya lee 20 equipos semilla desde MySQL por una API REST; la disponibilidad por fechas y los demás módulos siguen pendientes.
-- **Pruebas:** la integración se comprobó manualmente con una solicitud HTTP; las pruebas automatizadas siguen pendientes.
+- **Código:** el esqueleto Maven compila para Java 21. El catálogo lista equipos y busca disponibilidad por intervalo, consultando MySQL mediante una API REST. Los demás módulos siguen pendientes.
+- **Pruebas:** tres pruebas unitarias cubren la duración inclusiva y el rechazo de intervalos invertidos. La API se comprobó manualmente: un intervalo de tres fechas devolvió 20 equipos y un intervalo invertido respondió HTTP 400. Falta automatizar pruebas de integración de la consulta SQL.

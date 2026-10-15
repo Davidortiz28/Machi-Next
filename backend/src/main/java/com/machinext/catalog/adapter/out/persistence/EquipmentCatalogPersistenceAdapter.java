@@ -2,6 +2,7 @@ package com.machinext.catalog.adapter.out.persistence;
 
 import com.machinext.catalog.application.port.out.EquipmentCatalogPort;
 import com.machinext.catalog.domain.CatalogItem;
+import com.machinext.catalog.domain.RentalPeriod;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -17,17 +18,26 @@ public class EquipmentCatalogPersistenceAdapter implements EquipmentCatalogPort 
 
     @Override
     public List<CatalogItem> findCurrentCatalog() {
-        return repository.findCurrentCatalog().stream()
-                .map(row -> new CatalogItem(
-                        row.getEquipmentId(),
-                        row.getBusinessName(),
-                        row.getCategoryName(),
-                        row.getManufacturer(),
-                        row.getModelName(),
-                        row.getDescription(),
-                        row.getDailyAmount(),
-                        row.getDepositAmount(),
-                        row.getCurrency()))
+        return repository.findCurrentCatalog().stream().map(this::toDomain).toList();
+    }
+
+    @Override
+    public List<CatalogItem> findAvailable(RentalPeriod period) {
+        return repository.findAvailable(period.startDate(), period.returnDate()).stream()
+                .map(this::toDomain)
                 .toList();
+    }
+
+    private CatalogItem toDomain(EquipmentCatalogProjection row) {
+        return new CatalogItem(
+                row.getEquipmentId(),
+                row.getBusinessName(),
+                row.getCategoryName(),
+                row.getManufacturer(),
+                row.getModelName(),
+                row.getDescription(),
+                row.getDailyAmount(),
+                row.getDepositAmount(),
+                row.getCurrency());
     }
 }
