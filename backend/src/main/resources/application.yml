@@ -1,0 +1,19 @@
+spring:
+  application:
+    name: machi-next-api
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3307}/${MYSQL_DATABASE:machi_next}?serverTimezone=UTC
+    username: ${MYSQL_USER:machi_app}
+    password: ${MYSQL_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    show-sql: false
+
+server:
+  port: ${SERVER_PORT:8080}
+
+logging:
+  level:
+    root: INFO

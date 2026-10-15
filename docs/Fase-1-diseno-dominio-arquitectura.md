@@ -165,5 +165,5 @@ La estructura final de paquetes se decidirá al preparar el proyecto. La organiz
 
 - **Fase actual:** Fase 2, diseño de base de datos y normalización.
 - **Completado:** propuesta inicial de conceptos, módulos, agregados, estados, invariantes, casos de uso, puertos/adaptadores y reglas para días calendario, cancelaciones, evidencia de daños y transferencias pendientes.
-- **Pendiente:** ejecutar y verificar los scripts SQL y los datos semilla preparados en `database/`; corregir cualquier incompatibilidad antes de iniciar la implementación del dominio.
-- **Código y pruebas:** aún no iniciados.
+- **Completado desde la puesta en marcha:** los scripts SQL y los datos semilla se ejecutaron al inicializar MySQL 8.4.11 en Docker; los registros de MySQL confirman que ambos scripts terminaron sin errores.
+- **Código y pruebas:** el esqueleto Maven de Spring Boot está creado y compila para Java 21. Las reglas de negocio y las pruebas siguen pendientes.
