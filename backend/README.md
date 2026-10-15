@@ -38,11 +38,26 @@ Ejemplo de registro:
 
 ## Primer caso de uso: consultar el catálogo
 
-`GET /api/v1/catalog/equipment` devuelve equipos cuyo estado operativo es `AVAILABLE`, cuyo negocio está activo y que tienen una tarifa vigente hoy. La tarifa incluye el precio diario, el depósito y la moneda. Esta consulta no confirma disponibilidad para fechas concretas; eso se implementará en el flujo de reservas.
+`GET /api/v1/catalog/equipment` devuelve equipos cuyo estado operativo es `AVAILABLE`, cuyo negocio está activo y que tienen una tarifa vigente hoy. La tarifa incluye el precio diario, el depósito y la moneda.
 
 `GET /api/v1/catalog/equipment/availability?startDate=YYYY-MM-DD&returnDate=YYYY-MM-DD` filtra el catálogo para un período. Las dos fechas son inclusivas: una reserva existente se cruza con la búsqueda cuando `existing.start_date <= returnDate` y `existing.return_date >= startDate`. Se ignoran reservas canceladas/completadas; una reserva confirmada o un alquiler que se cruza bloquea el equipo. Un alquiler sin devolución registrada sigue bloqueándolo aunque haya pasado su fecha prevista de retorno. La tarifa debe cubrir todo el período solicitado. La respuesta incluye una cotización que multiplica la tarifa diaria por los días calendario y mantiene el depósito separado. Si la fecha de devolución es anterior al inicio, la API responde HTTP 400.
 
 Ambas rutas están separadas en un adaptador web, casos de uso, un puerto de salida y un adaptador de persistencia. La consulta usa Spring Data JPA con SQL nativo porque el catálogo combina cuatro tablas; la proyección evita cargar entidades completas que la respuesta no necesita. `RentalPeriod` aplica la regla de contar inicio y devolución, por lo que una renta del mismo día equivale a un día calendario.
+
+## Reservas
+
+Las rutas siguientes requieren un JWT de una cuenta con rol `CLIENTE`:
+
+- `POST /api/v1/reservations` crea una reserva con `equipmentId`, `startDate` y `returnDate` (`YYYY-MM-DD`). El servidor vuelve a verificar la tarifa y disponibilidad y conserva el precio diario, el depósito y el total como valores históricos de la reserva. El inicio y el día de devolución cuentan dentro del período.
+- `GET /api/v1/reservations` lista las reservas del cliente autenticado.
+
+Ejemplo de solicitud:
+
+```json
+{"equipmentId":1,"startDate":"2026-10-20","returnDate":"2026-10-22"}
+```
+
+En este corte `CONFIRMED` representa una reserva de demostración. No se realiza un cobro real ni se integra una pasarela de pagos; ese paso debe completarse antes de tratar la API como un sistema de renta en producción. La verificación y creación se ejecutan en una transacción con bloqueo del equipo para evitar que dos solicitudes simultáneas lo reserven en fechas que se cruzan.
 
 ## Arquitectura
 
