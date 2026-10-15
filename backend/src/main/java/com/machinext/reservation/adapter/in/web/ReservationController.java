@@ -13,6 +13,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -41,6 +42,14 @@ public class ReservationController {
         return reservationService.listForCustomer(Long.parseLong(jwt.getSubject()));
     }
 
+    @PostMapping("/{reservationId}/cancel")
+    public ReservationService.CancellationResponse cancel(@AuthenticationPrincipal Jwt jwt,
+                                                           @PathVariable long reservationId,
+                                                           @Valid @RequestBody(required = false) CancelReservationRequest request) {
+        return reservationService.cancel(Long.parseLong(jwt.getSubject()), reservationId,
+                request == null ? null : request.reason());
+    }
+
     @ExceptionHandler(InvalidRentalPeriodException.class)
     public ResponseEntity<ProblemDetail> handleInvalidRentalPeriod(InvalidRentalPeriodException exception) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
@@ -50,4 +59,6 @@ public class ReservationController {
     public record CreateReservationRequest(@NotNull @Positive Long equipmentId,
                                            @NotNull LocalDate startDate,
                                            @NotNull LocalDate returnDate) { }
+
+    public record CancelReservationRequest(@jakarta.validation.constraints.Size(max = 500) String reason) { }
 }

@@ -50,6 +50,7 @@ Las rutas siguientes requieren un JWT de una cuenta con rol `CLIENTE`:
 
 - `POST /api/v1/reservations` crea una reserva con `equipmentId`, `startDate` y `returnDate` (`YYYY-MM-DD`). El servidor vuelve a verificar la tarifa y disponibilidad y conserva el precio diario, el depósito y el total como valores históricos de la reserva. El inicio y el día de devolución cuentan dentro del período.
 - `GET /api/v1/reservations` lista las reservas del cliente autenticado.
+- `POST /api/v1/reservations/{reservationId}/cancel` cancela una reserva confirmada propia. Acepta un cuerpo opcional `{"reason":"..."}`. Devuelve 100% si faltan 24 horas o más para el inicio y 90% si falta menos; calcula el porcentaje sobre renta más depósito y lo registra en la reserva.
 
 Ejemplo de solicitud:
 
@@ -57,7 +58,7 @@ Ejemplo de solicitud:
 {"equipmentId":1,"startDate":"2026-10-20","returnDate":"2026-10-22"}
 ```
 
-En este corte `CONFIRMED` representa una reserva de demostración. No se realiza un cobro real ni se integra una pasarela de pagos; ese paso debe completarse antes de tratar la API como un sistema de renta en producción. La verificación y creación se ejecutan en una transacción con bloqueo del equipo para evitar que dos solicitudes simultáneas lo reserven en fechas que se cruzan.
+En este corte `CONFIRMED` representa una reserva de demostración. Los importes de reembolso se calculan y la cancelación queda registrada, pero no se realiza un pago ni un reembolso real y no se integra una pasarela; ese paso debe completarse antes de tratar la API como un sistema de renta en producción. La verificación y creación se ejecutan en una transacción con bloqueo del equipo para evitar que dos solicitudes simultáneas lo reserven en fechas que se cruzan.
 
 ## Arquitectura
 
