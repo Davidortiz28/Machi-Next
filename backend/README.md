@@ -58,7 +58,7 @@ Ejemplo de solicitud:
 {"equipmentId":1,"startDate":"2026-10-20","returnDate":"2026-10-22"}
 ```
 
-En este corte `CONFIRMED` representa una reserva de demostración. Los importes de reembolso se calculan y la cancelación queda registrada, pero no se realiza un pago ni un reembolso real y no se integra una pasarela; ese paso debe completarse antes de tratar la API como un sistema de renta en producción. La verificación y creación se ejecutan en una transacción con bloqueo del equipo para evitar que dos solicitudes simultáneas lo reserven en fechas que se cruzan.
+En este corte `CONFIRMED` representa una reserva de demostración. Los cargos y reembolsos se guardan como operaciones simuladas en `payment_operation`; no se mueve dinero ni se integra una pasarela. La verificación y creación se ejecutan en una transacción con bloqueo del equipo para evitar que dos solicitudes simultáneas lo reserven en fechas que se cruzan.
 
 ## Entrega y devolución
 
@@ -67,7 +67,9 @@ Estas rutas requieren un JWT con rol `PROVEEDOR` y el proveedor debe tener una a
 - `POST /api/v1/rentals/{reservationId}/handover` registra quién entrega el equipo y cambia la reserva a `IN_RENTAL`.
 - `POST /api/v1/rentals/{reservationId}/return` recibe `{"condition":"GOOD"}`, `{"condition":"PARTIAL_DAMAGE"}` o `{"condition":"TOTAL_DAMAGE"}`. Registra quién recibe el equipo, cambia la reserva a `COMPLETED` y crea un reporte de daño cuando corresponde.
 
-La respuesta indica `DEPOSIT_REFUND_PENDING` para un equipo en buen estado y `DAMAGE_REVIEW_PENDING` cuando hay daño. El siguiente bloque será adjuntar evidencias y aprobar el monto retenido antes de generar el reembolso del depósito.
+Una devolución `GOOD` registra un reembolso simulado por el total del depósito. Si hay daño, el proveedor que hizo la entrega debe adjuntar evidencia con `POST /api/v1/rentals/{reservationId}/damage-evidence` usando `multipart/form-data` con el campo `file`. Se aceptan JPG, PNG, MP4 y PDF de hasta 10 MB. Los archivos quedan en `./uploads/evidence` (configurable con `EVIDENCE_STORAGE_DIRECTORY`) y ese directorio está excluido de Git.
+
+Un administrador revisa los casos en `GET /api/v1/admin/damage-reports`, consulta evidencias en `GET /api/v1/admin/damage-reports/{reportId}/evidence` y las descarga o visualiza en `GET /api/v1/admin/damage-reports/{reportId}/evidence/{evidenceId}/content`. Para resolver un reporte usa `POST /api/v1/admin/damage-reports/{reportId}/review` con `{"decision":"APPROVE","assessedAmount":40000,"retainedAmount":30000,"decisionNote":"Daño parcial verificado"}`. La retención no puede exceder el daño evaluado ni el depósito; el saldo se registra como reembolso simulado. Con `REJECT`, el depósito completo se registra para devolución. Se requiere al menos una evidencia antes de la revisión.
 
 ## Arquitectura
 

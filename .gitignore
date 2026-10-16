@@ -5,3 +5,7 @@
 
 # Local Java build output
 target/
+
+# Locally uploaded rental evidence
+/uploads/
+/backend/uploads/

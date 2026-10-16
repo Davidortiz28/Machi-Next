@@ -2,6 +2,7 @@ package com.machinext.reservation.application;
 
 import com.machinext.catalog.domain.RentalPeriod;
 import com.machinext.reservation.domain.CancellationPolicy;
+import com.machinext.reservation.domain.DepositSettlement;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -78,6 +79,10 @@ public class ReservationService {
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, reservationId, equipmentId, rate.rateId(), startDate, returnDate,
                 startDate.atStartOfDay(), rate.dailyAmount(), rate.depositAmount(), rentalAmount);
+        recordPayment(reservationId, "RENT_CHARGE", "reservation:" + reservationId + ":rent:charge",
+                rentalAmount, rate.currency());
+        recordPayment(reservationId, "DEPOSIT_CHARGE", "reservation:" + reservationId + ":deposit:charge",
+                rate.depositAmount(), rate.currency());
         return new ReservationResponse(reservationId, equipmentId, "CONFIRMED", startDate, returnDate,
                 period.calendarDaysInclusive(), rate.dailyAmount(), rentalAmount, rate.depositAmount(), rate.currency());
     }
@@ -122,15 +127,21 @@ public class ReservationService {
 
         LocalDateTime cancelledAt = LocalDateTime.now();
         int refundPercent = CancellationPolicy.refundPercent(cancelledAt, reservation.scheduledStartAt());
-        BigDecimal amountCharged = reservation.rentalAmount().add(reservation.depositAmount());
-        BigDecimal refundAmount = amountCharged.multiply(BigDecimal.valueOf(refundPercent))
+        BigDecimal rentRefund = reservation.rentalAmount().multiply(BigDecimal.valueOf(refundPercent))
                 .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+        BigDecimal depositRefund = reservation.depositAmount().multiply(BigDecimal.valueOf(refundPercent))
+                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+        BigDecimal refundAmount = rentRefund.add(depositRefund);
         jdbc.update("""
                 UPDATE reservation
                 SET status = 'CANCELLED', cancelled_at = ?, cancellation_reason = ?, refund_percent = ?
                 WHERE reservation_id = ? AND customer_user_id = ?
                 """, cancelledAt, reason == null || reason.isBlank() ? null : reason.trim(),
                 refundPercent, reservationId, customerId);
+        recordPayment(reservationId, "RENT_REFUND", "reservation:" + reservationId + ":cancel:rent-refund",
+                rentRefund, reservation.currency());
+        recordPayment(reservationId, "DEPOSIT_REFUND", "reservation:" + reservationId + ":cancel:deposit-refund",
+                depositRefund, reservation.currency());
         return new CancellationResponse(reservationId, "CANCELLED", refundPercent, refundAmount, reservation.currency());
     }
 
@@ -160,14 +171,17 @@ public class ReservationService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La condición debe ser GOOD, PARTIAL_DAMAGE o TOTAL_DAMAGE");
         }
         List<RentalData> rows = jdbc.query("""
-                SELECT r.status, r.business_id, ri.reservation_item_id, re.rental_id
+                SELECT r.status, r.business_id, ri.reservation_item_id, re.rental_id,
+                       re.handed_over_by_user_id, ri.deposit_snapshot, dr.currency
                 FROM reservation r
                 JOIN reservation_item ri ON ri.reservation_id = r.reservation_id
                 JOIN rental re ON re.reservation_item_id = ri.reservation_item_id
+                JOIN daily_rate dr ON dr.equipment_id = ri.equipment_id AND dr.rate_id = ri.rate_id
                 WHERE r.reservation_id = ? AND re.returned_at IS NULL
                 FOR UPDATE
                 """, (rs, rowNum) -> new RentalData(rs.getString("status"), rs.getLong("business_id"),
-                rs.getLong("reservation_item_id"), rs.getLong("rental_id")), reservationId);
+                rs.getLong("reservation_item_id"), rs.getLong("rental_id"), rs.getLong("handed_over_by_user_id"),
+                rs.getBigDecimal("deposit_snapshot"), rs.getString("currency")), reservationId);
         if (rows.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No existe un alquiler activo para esa reserva");
         }
@@ -184,10 +198,156 @@ public class ReservationService {
         jdbc.update("UPDATE reservation SET status = 'COMPLETED' WHERE reservation_id = ?", reservationId);
         if (!"GOOD".equals(condition)) {
             jdbc.update("INSERT INTO damage_report (rental_id, reported_by_user_id, status) VALUES (?, ?, 'REPORTED')",
-                    rental.rentalId(), providerId);
+                    rental.rentalId(), rental.handedOverByUserId());
+        } else {
+            recordPayment(reservationId, "DEPOSIT_REFUND", "reservation:" + reservationId + ":deposit:return",
+                    rental.depositAmount(), rental.currency());
         }
         return new RentalLifecycleResponse(reservationId, "COMPLETED", null, returnedAt, condition,
-                "GOOD".equals(condition) ? "DEPOSIT_REFUND_PENDING" : "DAMAGE_REVIEW_PENDING");
+                "GOOD".equals(condition) ? "DEPOSIT_REFUNDED" : "DAMAGE_REVIEW_PENDING");
+    }
+
+    @Transactional
+    public EvidenceResponse attachDamageEvidence(long providerId, long reservationId, String storageKey, String mediaType) {
+        List<DamageReportData> reports = jdbc.query("""
+                SELECT dr.damage_report_id, dr.reported_by_user_id, r.business_id
+                FROM damage_report dr
+                JOIN rental re ON re.rental_id = dr.rental_id
+                JOIN reservation_item ri ON ri.reservation_item_id = re.reservation_item_id
+                JOIN reservation r ON r.reservation_id = ri.reservation_id
+                WHERE r.reservation_id = ? AND dr.status = 'REPORTED'
+                ORDER BY dr.reported_at DESC
+                LIMIT 1 FOR UPDATE
+                """, (rs, rowNum) -> new DamageReportData(rs.getLong("damage_report_id"),
+                rs.getLong("reported_by_user_id"), rs.getLong("business_id")), reservationId);
+        if (reports.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "La reserva no tiene un reporte de daño pendiente");
+        }
+        DamageReportData report = reports.getFirst();
+        if (report.reporterId() != providerId) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solo el proveedor que entregó el equipo puede adjuntar la evidencia");
+        }
+        LocalDateTime uploadedAt = LocalDateTime.now();
+        jdbc.update("""
+                INSERT INTO damage_evidence (damage_report_id, uploaded_by_user_id, storage_key, media_type, uploaded_at)
+                VALUES (?, ?, ?, ?, ?)
+                """, report.reportId(), providerId, storageKey, mediaType, uploadedAt);
+        Long evidenceId = jdbc.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+        return new EvidenceResponse(evidenceId, report.reportId(), mediaType, uploadedAt, providerId);
+    }
+
+    public List<PendingDamageReportResponse> listPendingDamageReports() {
+        return jdbc.query("""
+                SELECT dr.damage_report_id, r.reservation_id, ri.equipment_id, dr.reported_by_user_id,
+                       u.display_name AS reporter_name, dr.reported_at, ri.deposit_snapshot, dr.status,
+                       COUNT(de.evidence_id) AS evidence_count
+                FROM damage_report dr
+                JOIN rental re ON re.rental_id = dr.rental_id
+                JOIN reservation_item ri ON ri.reservation_item_id = re.reservation_item_id
+                JOIN reservation r ON r.reservation_id = ri.reservation_id
+                JOIN app_user u ON u.user_id = dr.reported_by_user_id
+                LEFT JOIN damage_evidence de ON de.damage_report_id = dr.damage_report_id
+                WHERE dr.status = 'REPORTED'
+                GROUP BY dr.damage_report_id, r.reservation_id, ri.equipment_id, dr.reported_by_user_id,
+                         u.display_name, dr.reported_at, ri.deposit_snapshot, dr.status
+                ORDER BY dr.reported_at
+                """, (rs, rowNum) -> new PendingDamageReportResponse(rs.getLong("damage_report_id"),
+                rs.getLong("reservation_id"), rs.getLong("equipment_id"), rs.getLong("reported_by_user_id"),
+                rs.getString("reporter_name"), rs.getTimestamp("reported_at").toLocalDateTime(),
+                rs.getBigDecimal("deposit_snapshot"), rs.getString("status"), rs.getLong("evidence_count")));
+    }
+
+    public List<EvidenceResponse> listDamageEvidence(long damageReportId) {
+        return jdbc.query("""
+                SELECT de.evidence_id, de.damage_report_id, de.media_type, de.uploaded_at, de.uploaded_by_user_id
+                FROM damage_evidence de
+                WHERE de.damage_report_id = ? ORDER BY de.uploaded_at
+                """, (rs, rowNum) -> new EvidenceResponse(rs.getLong("evidence_id"),
+                rs.getLong("damage_report_id"), rs.getString("media_type"),
+                rs.getTimestamp("uploaded_at").toLocalDateTime(), rs.getLong("uploaded_by_user_id")), damageReportId);
+    }
+
+    public StoredEvidenceResponse findDamageEvidence(long damageReportId, long evidenceId) {
+        List<StoredEvidenceResponse> files = jdbc.query("""
+                SELECT storage_key, media_type FROM damage_evidence
+                WHERE damage_report_id = ? AND evidence_id = ?
+                """, (rs, rowNum) -> new StoredEvidenceResponse(rs.getString("storage_key"), rs.getString("media_type")),
+                damageReportId, evidenceId);
+        if (files.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No existe esa evidencia");
+        }
+        return files.getFirst();
+    }
+
+    @Transactional
+    public DepositReviewResponse reviewDamage(long adminId, long damageReportId, String decision,
+                                              BigDecimal assessedAmount, BigDecimal retainedAmount,
+                                              String decisionNote) {
+        List<DamageReviewData> reports = jdbc.query("""
+                SELECT dr.status, r.reservation_id, ri.deposit_snapshot, drate.currency
+                FROM damage_report dr
+                JOIN rental re ON re.rental_id = dr.rental_id
+                JOIN reservation_item ri ON ri.reservation_item_id = re.reservation_item_id
+                JOIN reservation r ON r.reservation_id = ri.reservation_id
+                JOIN daily_rate drate ON drate.equipment_id = ri.equipment_id AND drate.rate_id = ri.rate_id
+                WHERE dr.damage_report_id = ?
+                FOR UPDATE
+                """, (rs, rowNum) -> new DamageReviewData(rs.getString("status"), rs.getLong("reservation_id"),
+                rs.getBigDecimal("deposit_snapshot"), rs.getString("currency")), damageReportId);
+        if (reports.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No existe ese reporte de daño");
+        }
+        DamageReviewData report = reports.getFirst();
+        if (!"REPORTED".equals(report.status())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "El reporte ya fue revisado");
+        }
+        Integer evidenceCount = jdbc.queryForObject("SELECT COUNT(*) FROM damage_evidence WHERE damage_report_id = ?",
+                Integer.class, damageReportId);
+        if (evidenceCount == null || evidenceCount == 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Adjunta al menos una evidencia antes de revisar el daño");
+        }
+        DepositSettlement settlement;
+        String reportStatus;
+        try {
+            if ("APPROVE".equals(decision)) {
+                settlement = DepositSettlement.approve(report.depositAmount(), assessedAmount, retainedAmount);
+                reportStatus = "APPROVED";
+            } else if ("REJECT".equals(decision)) {
+                if (retainedAmount.signum() != 0) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Un reporte rechazado debe devolver el depósito completo");
+                }
+                settlement = DepositSettlement.reject(report.depositAmount(), assessedAmount);
+                reportStatus = "REJECTED";
+            } else {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La decisión debe ser APPROVE o REJECT");
+            }
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
+        }
+        jdbc.update("""
+                UPDATE damage_report
+                SET reviewed_by_user_id = ?, assessed_amount = ?, retained_amount = ?, status = ?, decision_note = ?
+                WHERE damage_report_id = ?
+                """, adminId, settlement.assessedAmount(), settlement.retainedAmount(), reportStatus,
+                decisionNote == null || decisionNote.isBlank() ? null : decisionNote.trim(), damageReportId);
+        recordPayment(report.reservationId(), "DEPOSIT_RETENTION",
+                "reservation:" + report.reservationId() + ":deposit:retention", settlement.retainedAmount(), report.currency());
+        recordPayment(report.reservationId(), "DEPOSIT_REFUND",
+                "reservation:" + report.reservationId() + ":deposit:review-refund", settlement.refundAmount(), report.currency());
+        return new DepositReviewResponse(damageReportId, reportStatus, settlement.assessedAmount(),
+                settlement.retainedAmount(), settlement.refundAmount(), report.currency());
+    }
+
+    private void recordPayment(long reservationId, String operationType, String idempotencyKey,
+                               BigDecimal amount, String currency) {
+        if (amount.signum() <= 0) {
+            return;
+        }
+        jdbc.update("""
+                INSERT INTO payment_operation
+                  (reservation_id, operation_type, idempotency_key, amount, currency, status)
+                VALUES (?, ?, ?, ?, ?, 'SUCCEEDED')
+                """, reservationId, operationType, idempotencyKey, amount, currency);
     }
 
     private List<RentalData> findRental(long reservationId) {
@@ -197,7 +357,7 @@ public class ReservationService {
                 WHERE r.reservation_id = ?
                 FOR UPDATE
                 """, (rs, rowNum) -> new RentalData(rs.getString("status"), rs.getLong("business_id"),
-                rs.getLong("reservation_item_id"), null), reservationId);
+                rs.getLong("reservation_item_id"), null, null, null, null), reservationId);
     }
 
     private boolean providerAssignmentDoesNotMatch(long providerId, long businessId) {
@@ -211,7 +371,10 @@ public class ReservationService {
     private record Rate(long businessId, long rateId, BigDecimal dailyAmount, BigDecimal depositAmount, String currency) { }
     private record CancellationData(String status, LocalDateTime scheduledStartAt,
                                     BigDecimal rentalAmount, BigDecimal depositAmount, String currency) { }
-    private record RentalData(String status, long businessId, long itemId, Long rentalId) { }
+    private record RentalData(String status, long businessId, long itemId, Long rentalId,
+                              Long handedOverByUserId, BigDecimal depositAmount, String currency) { }
+    private record DamageReportData(long reportId, long reporterId, long businessId) { }
+    private record DamageReviewData(String status, long reservationId, BigDecimal depositAmount, String currency) { }
 
     public record ReservationResponse(long reservationId, long equipmentId, String status,
                                       LocalDate startDate, LocalDate returnDate, long calendarDays,
@@ -224,4 +387,16 @@ public class ReservationService {
     public record RentalLifecycleResponse(long reservationId, String status,
                                           LocalDateTime handedOverAt, LocalDateTime returnedAt,
                                           String returnCondition, String depositAction) { }
+
+    public record EvidenceResponse(long evidenceId, long damageReportId, String mediaType,
+                                   LocalDateTime uploadedAt, long uploadedByUserId) { }
+
+    public record PendingDamageReportResponse(long damageReportId, long reservationId, long equipmentId,
+                                             long reportedByUserId, String reporterName, LocalDateTime reportedAt,
+                                             BigDecimal depositAmount, String status, long evidenceCount) { }
+
+    public record StoredEvidenceResponse(String storageKey, String mediaType) { }
+
+    public record DepositReviewResponse(long damageReportId, String status, BigDecimal assessedAmount,
+                                        BigDecimal retainedAmount, BigDecimal refundAmount, String currency) { }
 }
