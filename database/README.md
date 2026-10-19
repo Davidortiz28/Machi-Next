@@ -12,7 +12,7 @@ docker compose ps
 docker compose logs -f db
 ```
 
-Al inicializar un volumen vacío, la imagen ejecuta `001_schema.sql`, `002_seed_demo.sql` y las migraciones `003` a `005` en orden. La base queda disponible en `127.0.0.1:${MYSQL_PORT}`, con base `machi_next` y usuario de aplicación `machi_app`. En esta máquina `.env` publica MySQL en el puerto `3307`, ya que Windows no permitió reservar `3306`; si cambias el valor de `MYSQL_PORT`, usa el mismo puerto al conectar desde aplicaciones ejecutadas en el host. Dentro de Docker, el servicio sigue escuchando en el puerto `3306`. Las credenciales locales están en `.env`, que Git ignora.
+Al inicializar un volumen vacío, la imagen ejecuta `001_schema.sql`, `002_seed_demo.sql` y las migraciones `003` a `006` en orden. La base queda disponible en `127.0.0.1:${MYSQL_PORT}`, con base `machi_next` y usuario de aplicación `machi_app`. En esta máquina `.env` publica MySQL en el puerto `3307`, ya que Windows no permitió reservar `3306`; si cambias el valor de `MYSQL_PORT`, usa el mismo puerto al conectar desde aplicaciones ejecutadas en el host. Dentro de Docker, el servicio sigue escuchando en el puerto `3306`. Las credenciales locales están en `.env`, que Git ignora.
 
 Los scripts se ejecutan automáticamente solo cuando MySQL inicializa un volumen vacío. Si el contenedor ya tiene un volumen con datos, no se vuelven a aplicar. `001_schema.sql` no elimina tablas ni datos; `002_seed_demo.sql` usa identificadores explícitos y está pensado para ejecutarse una vez sobre un esquema vacío. No repetir el seed sin revisar posibles conflictos.
 
@@ -22,4 +22,4 @@ Los usuarios usan `password_hash = 'NO_LOGIN_DEMO_SEED'` y estado `INACTIVE`: no
 
 Los scripts se ejecutaron al crear el volumen Docker local. Los registros de MySQL confirmaron que ambos archivos terminaron sin errores. Si necesitas reiniciar la base desde cero, recuerda que los scripts de inicialización solo se ejecutan automáticamente cuando el volumen está vacío.
 
-Para un volumen ya inicializado, ejecuta el contenido de cada migración nueva que aún no hayas aplicado, en orden, una sola vez con un cliente MySQL conectado como `root` (por ejemplo, MySQL Workbench). Las migraciones agregan campos de aprobación, espera y administración de negocio; no las repitas. No borres el volumen para aplicar estas actualizaciones: eso eliminaría los datos locales.
+Para un volumen ya inicializado, ejecuta el contenido de cada migración nueva que aún no hayas aplicado, en orden, una sola vez con un cliente MySQL conectado como `root` (por ejemplo, MySQL Workbench). Las migraciones agregan campos de aprobación, espera, administración por negocio y auditoría de transferencias automáticas; no las repitas. No borres el volumen para aplicar estas actualizaciones: eso eliminaría los datos locales.

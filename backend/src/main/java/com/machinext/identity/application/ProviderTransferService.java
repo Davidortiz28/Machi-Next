@@ -109,6 +109,15 @@ public class ProviderTransferService {
     @Transactional
     public TransferResponse complete(long transferId, long adminUserId) {
         requireActiveAdmin(adminUserId);
+        return completeDueTransfer(transferId, adminUserId, "ADMIN");
+    }
+
+    @Transactional
+    public TransferResponse completeAutomatically(long transferId) {
+        return completeDueTransfer(transferId, null, "SYSTEM");
+    }
+
+    private TransferResponse completeDueTransfer(long transferId, Long actorUserId, String completionMethod) {
         List<WaitingTransfer> rows = jdbc.query("""
                 SELECT provider_user_id, from_business_id, to_business_id, status, effective_at
                 FROM provider_transfer WHERE transfer_id = ? FOR UPDATE
@@ -142,8 +151,8 @@ public class ProviderTransferService {
                 transfer.providerUserId(), transfer.toBusinessId(), effectiveAt);
         jdbc.update("""
                 UPDATE provider_transfer SET status = 'COMPLETED', completed_at = CURRENT_TIMESTAMP(6),
-                    completed_by_user_id = ? WHERE transfer_id = ?
-                """, adminUserId, transferId);
+                    completed_by_user_id = ?, completion_method = ? WHERE transfer_id = ?
+                """, actorUserId, completionMethod, transferId);
         return getTransfer(transferId);
     }
 
@@ -192,7 +201,7 @@ public class ProviderTransferService {
                        t.requested_at, t.status, t.from_business_decision, t.from_business_decided_at,
                        t.from_business_decided_by_user_id, t.to_business_decision, t.to_business_decided_at,
                        t.to_business_decided_by_user_id, t.approved_at, t.effective_at, t.completed_at,
-                       t.completed_by_user_id
+                       t.completed_by_user_id, t.completion_method
                 FROM provider_transfer t
                 JOIN app_user u ON u.user_id = t.provider_user_id
                 JOIN business fb ON fb.business_id = t.from_business_id
@@ -209,7 +218,7 @@ public class ProviderTransferService {
                 nullableLong(rs, "from_business_decided_by_user_id"), rs.getString("to_business_decision"),
                 localDateTime(rs, "to_business_decided_at"), nullableLong(rs, "to_business_decided_by_user_id"),
                 localDateTime(rs, "approved_at"), localDateTime(rs, "effective_at"), localDateTime(rs, "completed_at"),
-                nullableLong(rs, "completed_by_user_id"));
+                nullableLong(rs, "completed_by_user_id"), rs.getString("completion_method"));
     }
 
     private LocalDateTime localDateTime(java.sql.ResultSet rs, String column) throws java.sql.SQLException {
@@ -234,5 +243,5 @@ public class ProviderTransferService {
                                    LocalDateTime fromBusinessDecidedAt, Long fromBusinessDecidedByUserId,
                                    String toBusinessDecision, LocalDateTime toBusinessDecidedAt,
                                    Long toBusinessDecidedByUserId, LocalDateTime approvedAt, LocalDateTime effectiveAt,
-                                   LocalDateTime completedAt, Long completedByUserId) { }
+                                   LocalDateTime completedAt, Long completedByUserId, String completionMethod) { }
 }
