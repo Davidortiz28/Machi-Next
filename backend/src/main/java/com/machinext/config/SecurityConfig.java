@@ -16,12 +16,13 @@ public class SecurityConfig {
         return http
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
-                        .requestMatchers("/", "/index.html", "/styles.css", "/app.js").permitAll()
+                        .requestMatchers("/", "/index.html", "/styles.css", "/app.js", "/provider.html", "/provider.css", "/provider.js").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/catalog/equipment").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/catalog/equipment/availability").permitAll()
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/business/**").hasRole("BUSINESS_ADMIN")
+                        .requestMatchers("/api/v1/provider/**").hasRole("PROVEEDOR")
                         .requestMatchers("/api/v1/reservations/**").hasRole("CLIENTE")
                         .requestMatchers("/api/v1/rentals/**").hasAnyRole("PROVEEDOR", "ADMIN")
                         .anyRequest().authenticated())

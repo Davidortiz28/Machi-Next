@@ -40,6 +40,16 @@ Ejemplo de registro:
 
 Con el backend y MySQL activos, abre `http://localhost:8080/`. La página consume la API en el mismo origen y permite consultar disponibilidad por fechas, crear una cuenta cliente, iniciar sesión, revisar el precio y depósito por separado, confirmar una reserva y ver las reservas de la sesión. El JWT se conserva en `sessionStorage` y se elimina al cerrar la pestaña o salir.
 
+Las cuentas `PROVEEDOR` pueden abrir `/provider.html` después de iniciar sesión en el catálogo. El panel muestra los equipos del negocio que tienen asignado y permite registrar equipos con tarifa y depósito, además de cambiar su estado entre `AVAILABLE`, `MAINTENANCE` y `RETIRED`. Un proveedor sin asignación vigente no puede consultar ni modificar inventario.
+
+La API de inventario requiere un JWT con rol `PROVEEDOR` y obtiene el negocio exclusivamente de la asignación vigente del usuario:
+
+- `GET /api/v1/provider/equipment` lista los equipos y su última tarifa registrada.
+- `POST /api/v1/provider/equipment` registra `categoryName`, `manufacturer`, `modelName`, `serialNumber`, `dailyAmount`, `depositAmount` y `validFrom`; acepta también `description`, `currency` (por defecto `COP`) y `validTo` opcional.
+- `PATCH /api/v1/provider/equipment/{equipmentId}/status` actualiza el estado con `{"status":"MAINTENANCE"}` (también acepta `AVAILABLE` o `RETIRED`).
+
+El número de serie debe ser único dentro del negocio. La misma categoría y modelo se reutilizan al registrar unidades adicionales. Las tarifas y el inventario se guardan en las tablas existentes, y las nuevas unidades comienzan como `AVAILABLE`.
+
 ### Configurar el primer administrador
 
 El primer administrador se crea una sola vez con `POST /api/v1/auth/bootstrap-admin`. El endpoint exige `ADMIN_BOOTSTRAP_TOKEN`, un secreto aleatorio de al menos 32 caracteres. Si ya hay un administrador activo, devuelve conflicto; si el secreto no está configurado o no coincide, rechaza la solicitud. El script de datos demo crea un administrador inactivo, por lo que no bloquea esta inicialización.

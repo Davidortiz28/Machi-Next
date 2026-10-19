@@ -160,6 +160,7 @@
     document.querySelector("#sign-out").hidden = !loggedIn;
     document.querySelector("#my-reservations-link").hidden = !loggedIn;
     document.querySelector("#my-reservations").hidden = !loggedIn;
+    document.querySelector("#provider-dashboard-link").hidden = !loggedIn || !user.roles?.includes("PROVEEDOR");
     if (loggedIn) {
       document.querySelector("#sign-out").textContent = user.displayName || user.email;
     }

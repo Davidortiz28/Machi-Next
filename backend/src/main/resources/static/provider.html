@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Inventario del proveedor · Machi Next</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/provider.css">
+  <script src="/provider.js" defer></script>
+</head>
+<body>
+  <header class="site-header"><a class="brand" href="/">Machi<span>Next</span></a><nav class="top-actions"><a class="nav-link" href="/">Volver al catálogo</a></nav></header>
+  <main class="provider-main">
+    <section class="provider-heading"><p class="eyebrow">PANEL DEL PROVEEDOR</p><h1>Inventario del negocio</h1><p>Administra equipos, tarifas y disponibilidad operativa de tu negocio asignado.</p><p id="provider-message" role="status"></p></section>
+    <section class="provider-panel"><h2>Registrar equipo</h2>
+      <form id="equipment-form" class="provider-form">
+        <label>Categoría<input name="categoryName" maxlength="100" required placeholder="Herramientas eléctricas"></label>
+        <label>Fabricante<input name="manufacturer" maxlength="120" required placeholder="Fabricante"></label>
+        <label>Modelo<input name="modelName" maxlength="160" required placeholder="Modelo"></label>
+        <label>Número de serie<input name="serialNumber" maxlength="100" required></label>
+        <label>Precio diario (COP)<input name="dailyAmount" type="number" min="0" step="0.01" required></label>
+        <label>Depósito (COP)<input name="depositAmount" type="number" min="0" step="0.01" required></label>
+        <label>Tarifa vigente desde<input name="validFrom" type="date" required></label>
+        <label class="wide">Descripción<textarea name="description" maxlength="1000" rows="3"></textarea></label>
+        <div class="wide"><button class="button button-primary" type="submit">Registrar equipo</button><span id="form-message" role="status"></span></div>
+      </form>
+    </section>
+    <section class="provider-panel"><div class="inventory-title"><div><h2>Equipos registrados</h2><p id="inventory-status">Cargando inventario…</p></div><button class="button button-outline" id="reload-inventory" type="button">Actualizar</button></div><div id="inventory-list" class="inventory-list"></div></section>
+  </main>
+</body>
+</html>
