@@ -63,6 +63,12 @@ public class AdminController {
         return transferService.decide(transferId, Long.parseLong(jwt.getSubject()), "DESTINATION", request.decision());
     }
 
+    @PostMapping("/provider-transfers/{transferId}/complete")
+    public ProviderTransferService.TransferResponse completeTransfer(@AuthenticationPrincipal Jwt jwt,
+            @PathVariable long transferId) {
+        return transferService.complete(transferId, Long.parseLong(jwt.getSubject()));
+    }
+
     public record CreateProviderRequest(@NotBlank @Email @Size(max = 254) String email,
                                         @NotBlank @Size(min = 12, max = 72) String password,
                                         @NotBlank @Size(max = 160) String displayName,

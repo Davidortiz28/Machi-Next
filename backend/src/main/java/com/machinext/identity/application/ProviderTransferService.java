@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.sql.Timestamp;
 import java.util.List;
 
 @Service
@@ -36,7 +37,7 @@ public class ProviderTransferService {
         List<Business> destinations = jdbc.query("SELECT business_id, legal_name FROM business WHERE business_id = ? AND status = 'ACTIVE'",
                 (rs, row) -> new Business(rs.getLong("business_id"), rs.getString("legal_name")), toBusinessId);
         if (destinations.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Negocio de destino no encontrado o inactivo");
-        Integer pending = jdbc.queryForObject("SELECT COUNT(*) FROM provider_transfer WHERE provider_user_id = ? AND status = 'PENDING'",
+        Integer pending = jdbc.queryForObject("SELECT COUNT(*) FROM provider_transfer WHERE provider_user_id = ? AND status IN ('PENDING', 'WAITING')",
                 Integer.class, providerUserId);
         if (pending != null && pending > 0) throw new ResponseStatusException(HttpStatus.CONFLICT, "El proveedor ya tiene una transferencia pendiente");
         jdbc.update("""
@@ -76,11 +77,60 @@ public class ProviderTransferService {
         }
         String nextStatus = "REJECTED".equals(decision) || "REJECTED".equals(priorDecision) ? "REJECTED"
                 : ("APPROVED".equals("SOURCE".equals(side) ? transfer.toDecision() : transfer.fromDecision())
-                    ? "APPROVED" : null);
-        if (nextStatus != null) {
+                    ? "WAITING" : null);
+        if ("REJECTED".equals(nextStatus)) {
             jdbc.update("UPDATE provider_transfer SET status = ?, resolved_at = CURRENT_TIMESTAMP(6), resolved_by_user_id = ? WHERE transfer_id = ?",
                     nextStatus, adminUserId, transferId);
+        } else if ("WAITING".equals(nextStatus)) {
+            jdbc.update("""
+                    UPDATE provider_transfer
+                    SET status = 'WAITING', approved_at = CURRENT_TIMESTAMP(6),
+                        effective_at = DATE_ADD(CURRENT_TIMESTAMP(6), INTERVAL 3 DAY),
+                        resolved_at = CURRENT_TIMESTAMP(6), resolved_by_user_id = ?
+                    WHERE transfer_id = ?
+                    """, adminUserId, transferId);
         }
+        return getTransfer(transferId);
+    }
+
+    @Transactional
+    public TransferResponse complete(long transferId, long adminUserId) {
+        requireActiveAdmin(adminUserId);
+        List<WaitingTransfer> rows = jdbc.query("""
+                SELECT provider_user_id, from_business_id, to_business_id, status, effective_at
+                FROM provider_transfer WHERE transfer_id = ? FOR UPDATE
+                """, (rs, row) -> new WaitingTransfer(rs.getLong("provider_user_id"), rs.getLong("from_business_id"),
+                rs.getLong("to_business_id"), rs.getString("status"), rs.getTimestamp("effective_at") == null
+                ? null : rs.getTimestamp("effective_at").toLocalDateTime()), transferId);
+        if (rows.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Solicitud de transferencia no encontrada");
+        WaitingTransfer transfer = rows.getFirst();
+        if (!"WAITING".equals(transfer.status())) throw new ResponseStatusException(HttpStatus.CONFLICT, "La transferencia no está en espera");
+        if (transfer.effectiveAt() == null || jdbc.queryForObject(
+                "SELECT effective_at > CURRENT_TIMESTAMP(6) FROM provider_transfer WHERE transfer_id = ?", Boolean.class, transferId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "El periodo de espera de 3 días aún no ha terminado");
+        }
+        Integer activeDestination = jdbc.queryForObject("SELECT COUNT(*) FROM business WHERE business_id = ? AND status = 'ACTIVE'",
+                Integer.class, transfer.toBusinessId());
+        if (activeDestination == null || activeDestination == 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "El negocio de destino ya no está activo");
+        }
+        List<Long> currentAssignments = jdbc.query("""
+                SELECT assignment_id FROM provider_assignment
+                WHERE provider_user_id = ? AND business_id = ? AND ended_at IS NULL FOR UPDATE
+                """, (rs, row) -> rs.getLong("assignment_id"), transfer.providerUserId(), transfer.fromBusinessId());
+        if (currentAssignments.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "La asignación actual del proveedor cambió");
+        }
+        Timestamp effectiveAt = Timestamp.valueOf(transfer.effectiveAt());
+        int closed = jdbc.update("UPDATE provider_assignment SET ended_at = ? WHERE assignment_id = ? AND ended_at IS NULL",
+                effectiveAt, currentAssignments.getFirst());
+        if (closed != 1) throw new ResponseStatusException(HttpStatus.CONFLICT, "No se pudo cerrar la asignación actual");
+        jdbc.update("INSERT INTO provider_assignment (provider_user_id, business_id, started_at) VALUES (?, ?, ?)",
+                transfer.providerUserId(), transfer.toBusinessId(), effectiveAt);
+        jdbc.update("""
+                UPDATE provider_transfer SET status = 'COMPLETED', completed_at = CURRENT_TIMESTAMP(6),
+                    completed_by_user_id = ? WHERE transfer_id = ?
+                """, adminUserId, transferId);
         return getTransfer(transferId);
     }
 
@@ -105,7 +155,8 @@ public class ProviderTransferService {
                        t.to_business_id, tb.legal_name AS to_business_name,
                        t.requested_at, t.status, t.from_business_decision, t.from_business_decided_at,
                        t.from_business_decided_by_user_id, t.to_business_decision, t.to_business_decided_at,
-                       t.to_business_decided_by_user_id
+                       t.to_business_decided_by_user_id, t.approved_at, t.effective_at, t.completed_at,
+                       t.completed_by_user_id
                 FROM provider_transfer t
                 JOIN app_user u ON u.user_id = t.provider_user_id
                 JOIN business fb ON fb.business_id = t.from_business_id
@@ -120,7 +171,9 @@ public class ProviderTransferService {
                 rs.getTimestamp("requested_at").toLocalDateTime(), rs.getString("status"),
                 rs.getString("from_business_decision"), localDateTime(rs, "from_business_decided_at"),
                 nullableLong(rs, "from_business_decided_by_user_id"), rs.getString("to_business_decision"),
-                localDateTime(rs, "to_business_decided_at"), nullableLong(rs, "to_business_decided_by_user_id"));
+                localDateTime(rs, "to_business_decided_at"), nullableLong(rs, "to_business_decided_by_user_id"),
+                localDateTime(rs, "approved_at"), localDateTime(rs, "effective_at"), localDateTime(rs, "completed_at"),
+                nullableLong(rs, "completed_by_user_id"));
     }
 
     private LocalDateTime localDateTime(java.sql.ResultSet rs, String column) throws java.sql.SQLException {
@@ -136,10 +189,13 @@ public class ProviderTransferService {
     private record ProviderAssignment(long businessId, String status) { }
     private record Business(long id, String name) { }
     private record TransferRow(String status, String fromDecision, String toDecision) { }
+    private record WaitingTransfer(long providerUserId, long fromBusinessId, long toBusinessId, String status,
+                                   LocalDateTime effectiveAt) { }
     public record TransferResponse(long transferId, long providerUserId, String providerName, String providerEmail,
                                    long fromBusinessId, String fromBusinessName, long toBusinessId, String toBusinessName,
                                    LocalDateTime requestedAt, String status, String fromBusinessDecision,
                                    LocalDateTime fromBusinessDecidedAt, Long fromBusinessDecidedByUserId,
                                    String toBusinessDecision, LocalDateTime toBusinessDecidedAt,
-                                   Long toBusinessDecidedByUserId) { }
+                                   Long toBusinessDecidedByUserId, LocalDateTime approvedAt, LocalDateTime effectiveAt,
+                                   LocalDateTime completedAt, Long completedByUserId) { }
 }

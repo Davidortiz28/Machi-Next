@@ -85,7 +85,7 @@ Invoke-RestMethod -Method Post -Uri "http://localhost:8080/api/v1/admin/provider
 Invoke-RestMethod -Method Post -Uri "http://localhost:8080/api/v1/admin/provider-transfers/1/destination-decision" -Headers @{ Authorization = "Bearer $token" } -ContentType "application/json" -Body $decision
 ```
 
-Usa `REJECTED` para rechazar desde cualquiera de los lados. La solicitud pasa a `APPROVED` solo cuando ambos lados aprueban; un rechazo la resuelve como `REJECTED`. La decisión se guarda una sola vez por lado. En esta versión, los dos lados se registran por administradores globales, porque aún no hay cuentas/permisos delegados por negocio. La aprobación registra el acuerdo; la aplicación efectiva de la transferencia y su periodo de espera se implementarán en el bloque siguiente.
+Usa `REJECTED` para rechazar desde cualquiera de los lados. Cuando ambos aprueban, la solicitud pasa a `WAITING` y empieza un plazo fijo de 3 días. `effectiveAt` muestra cuándo podrá hacerse efectiva. Durante la espera el proveedor conserva su asignación actual. Al cumplirse el plazo, un administrador llama `POST /api/v1/admin/provider-transfers/{transferId}/complete`; la API cierra la asignación anterior y crea la nueva en una transacción, con fecha efectiva igual a `effectiveAt`. Antes del plazo responde HTTP 409. Un rechazo resuelve la solicitud como `REJECTED`. La decisión se guarda una sola vez por lado. En esta versión, ambos lados se registran por administradores globales, porque aún no hay cuentas/permisos delegados por negocio.
 
 ## Primer caso de uso: consultar el catálogo
 
