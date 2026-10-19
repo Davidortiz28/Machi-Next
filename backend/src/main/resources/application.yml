@@ -22,6 +22,7 @@ app:
   security:
     jwt-secret: ${JWT_SECRET:local-development-secret-change-this-before-deploying-2026}
     jwt-ttl-minutes: ${JWT_TTL_MINUTES:60}
+    admin-bootstrap-token: ${ADMIN_BOOTSTRAP_TOKEN:}
   evidence:
     storage-directory: ${EVIDENCE_STORAGE_DIRECTORY:./uploads/evidence}
 

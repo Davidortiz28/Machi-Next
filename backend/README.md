@@ -36,6 +36,47 @@ Ejemplo de registro:
 {"email":"cliente@example.com","password":"una-clave-segura","displayName":"Cliente de prueba"}
 ```
 
+### Configurar el primer administrador
+
+El primer administrador se crea una sola vez con `POST /api/v1/auth/bootstrap-admin`. El endpoint exige `ADMIN_BOOTSTRAP_TOKEN`, un secreto aleatorio de al menos 32 caracteres. Si ya hay un administrador activo, devuelve conflicto; si el secreto no está configurado o no coincide, rechaza la solicitud. El script de datos demo crea un administrador inactivo, por lo que no bloquea esta inicialización.
+
+Guarda un secreto propio en el `.env` local (no lo publiques) y cárgalo en la misma ventana de PowerShell donde ejecutarás la API:
+
+```powershell
+$env:ADMIN_BOOTSTRAP_TOKEN = "pega-aqui-un-secreto-aleatorio-de-32-caracteres-o-mas"
+mvn spring-boot:run
+```
+
+En otra ventana, usa ese mismo secreto para inicializar la cuenta. La respuesta contiene un JWT de administrador; el secreto no se almacena en la base de datos ni se devuelve:
+
+```powershell
+$body = @{
+  email = "admin@ejemplo.com"
+  password = "una-clave-segura-de-12-o-mas"
+  displayName = "Administrador"
+  bootstrapToken = "pega-aqui-un-secreto-aleatorio-de-32-caracteres-o-mas"
+} | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/v1/auth/bootstrap-admin -ContentType "application/json" -Body $body
+```
+
+### Negocios y proveedores
+
+Con el JWT retornado, consulta `GET /api/v1/admin/businesses` y crea un proveedor asignado a un negocio activo con `POST /api/v1/admin/providers`:
+
+```powershell
+$token = "JWT-devuelto-por-bootstrap"
+Invoke-RestMethod -Uri http://localhost:8080/api/v1/admin/businesses -Headers @{ Authorization = "Bearer $token" }
+$provider = @{
+  email = "proveedor@ejemplo.com"
+  password = "una-clave-segura-de-12-o-mas"
+  displayName = "Proveedor de prueba"
+  businessId = 1
+} | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/v1/admin/providers -Headers @{ Authorization = "Bearer $token" } -ContentType "application/json" -Body $provider
+```
+
+La cuenta queda activa con el rol `PROVEEDOR`. Las transferencias entre negocios requieren su flujo de consentimiento y espera, que se implementará aparte.
+
 ## Primer caso de uso: consultar el catálogo
 
 `GET /api/v1/catalog/equipment` devuelve equipos cuyo estado operativo es `AVAILABLE`, cuyo negocio está activo y que tienen una tarifa vigente hoy. La tarifa incluye el precio diario, el depósito y la moneda.

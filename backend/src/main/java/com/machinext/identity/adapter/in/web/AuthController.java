@@ -32,10 +32,21 @@ public class AuthController {
         return authService.login(request.email(), request.password());
     }
 
+    @PostMapping("/bootstrap-admin")
+    @ResponseStatus(HttpStatus.CREATED)
+    public AuthService.AuthResponse bootstrapAdmin(@Valid @RequestBody BootstrapAdminRequest request) {
+        return authService.bootstrapAdmin(request.email(), request.password(), request.displayName(), request.bootstrapToken());
+    }
+
     public record RegisterRequest(@NotBlank @Email @Size(max = 254) String email,
                                   @NotBlank @Size(min = 8, max = 72) String password,
                                   @NotBlank @Size(max = 160) String displayName) { }
 
     public record LoginRequest(@NotBlank @Email @Size(max = 254) String email,
                                @NotBlank String password) { }
+
+    public record BootstrapAdminRequest(@NotBlank @Email @Size(max = 254) String email,
+                                        @NotBlank @Size(min = 12, max = 72) String password,
+                                        @NotBlank @Size(max = 160) String displayName,
+                                        @NotBlank @Size(min = 32, max = 256) String bootstrapToken) { }
 }
