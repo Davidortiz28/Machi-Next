@@ -20,6 +20,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/catalog/equipment/availability").permitAll()
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/v1/business/**").hasRole("BUSINESS_ADMIN")
                         .requestMatchers("/api/v1/reservations/**").hasRole("CLIENTE")
                         .requestMatchers("/api/v1/rentals/**").hasAnyRole("PROVEEDOR", "ADMIN")
                         .anyRequest().authenticated())

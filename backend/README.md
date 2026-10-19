@@ -77,15 +77,18 @@ Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/v1/admin/providers
 
 La cuenta queda activa con el rol `PROVEEDOR`. Para iniciar una solicitud usa `POST /api/v1/admin/provider-transfers` con `providerUserId` y `toBusinessId`. El sistema determina el negocio actual a partir de la asignación vigente. Revisa las solicitudes con `GET /api/v1/admin/provider-transfers`.
 
-Cada lado registra su respuesta por separado; el JWT del administrador que la registra queda auditado:
+Un administrador global crea las cuentas que representan a los negocios con `POST /api/v1/admin/business-managers`, enviando `email`, `password`, `displayName` y `businessId`. Puede retirar el permiso con `DELETE /api/v1/admin/business-managers/{userId}/businesses/{businessId}`. Estos usuarios inician sesión en `/api/v1/auth/login`; sus credenciales solo autorizan decisiones para los negocios que tienen asignados.
+
+El administrador crea un representante por negocio (repite la solicitud para el negocio de destino):
 
 ```powershell
-$decision = @{ decision = "APPROVED" } | ConvertTo-Json
-Invoke-RestMethod -Method Post -Uri "http://localhost:8080/api/v1/admin/provider-transfers/1/source-decision" -Headers @{ Authorization = "Bearer $token" } -ContentType "application/json" -Body $decision
-Invoke-RestMethod -Method Post -Uri "http://localhost:8080/api/v1/admin/provider-transfers/1/destination-decision" -Headers @{ Authorization = "Bearer $token" } -ContentType "application/json" -Body $decision
+$manager = @{ email = "encargado-origen@example.com"; password = "clave-segura-de-12-o-mas"; displayName = "Encargado origen"; businessId = 1 } | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/v1/admin/business-managers -Headers @{ Authorization = "Bearer $token" } -ContentType "application/json" -Body $manager
 ```
 
-Usa `REJECTED` para rechazar desde cualquiera de los lados. Cuando ambos aprueban, la solicitud pasa a `WAITING` y empieza un plazo fijo de 3 días. `effectiveAt` muestra cuándo podrá hacerse efectiva. Durante la espera el proveedor conserva su asignación actual. Al cumplirse el plazo, un administrador llama `POST /api/v1/admin/provider-transfers/{transferId}/complete`; la API cierra la asignación anterior y crea la nueva en una transacción, con fecha efectiva igual a `effectiveAt`. Antes del plazo responde HTTP 409. Un rechazo resuelve la solicitud como `REJECTED`. La decisión se guarda una sola vez por lado. En esta versión, ambos lados se registran por administradores globales, porque aún no hay cuentas/permisos delegados por negocio.
+Los representantes de negocio consultan solo sus transferencias con `GET /api/v1/business/provider-transfers` y responden en `POST /api/v1/business/provider-transfers/{transferId}/source-decision` o `/destination-decision`, usando `{"decision":"APPROVED"}` o `{"decision":"REJECTED"}`. El servidor verifica que el usuario esté asignado al negocio correspondiente; un representante no puede aprobar por el otro lado a menos que tenga permisos explícitos para ese negocio también. Un administrador global puede iniciar y consultar solicitudes, pero no sustituir las decisiones de los representantes.
+
+Cuando ambos aprueban, la solicitud pasa a `WAITING` y empieza un plazo fijo de 3 días. `effectiveAt` muestra cuándo podrá hacerse efectiva. Durante la espera el proveedor conserva su asignación actual. Al cumplirse el plazo, un administrador llama `POST /api/v1/admin/provider-transfers/{transferId}/complete`; la API cierra la asignación anterior y crea la nueva en una transacción, con fecha efectiva igual a `effectiveAt`. Antes del plazo responde HTTP 409. Un rechazo resuelve la solicitud como `REJECTED`. La decisión se guarda una sola vez por lado.
 
 ## Primer caso de uso: consultar el catálogo
 

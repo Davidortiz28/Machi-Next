@@ -53,13 +53,26 @@ public class ProviderTransferService {
                 (rs, row) -> mapTransfer(rs));
     }
 
+    public List<TransferResponse> listForBusinessManager(long userId) {
+        requireBusinessManager(userId);
+        return jdbc.query(selectTransferSql() + """
+                 WHERE EXISTS (
+                    SELECT 1 FROM business_admin ba
+                    WHERE ba.user_id = ? AND ba.revoked_at IS NULL
+                      AND ba.business_id IN (t.from_business_id, t.to_business_id)
+                 ) ORDER BY t.requested_at DESC
+                """, (rs, row) -> mapTransfer(rs), userId);
+    }
+
     @Transactional
-    public TransferResponse decide(long transferId, long adminUserId, String side, String decision) {
-        requireActiveAdmin(adminUserId);
-        List<TransferRow> rows = jdbc.query("SELECT status, from_business_decision, to_business_decision FROM provider_transfer WHERE transfer_id = ? FOR UPDATE",
-                (rs, row) -> new TransferRow(rs.getString("status"), rs.getString("from_business_decision"), rs.getString("to_business_decision")), transferId);
+    public TransferResponse decide(long transferId, long userId, String side, String decision) {
+        List<TransferRow> rows = jdbc.query("SELECT status, from_business_id, to_business_id, from_business_decision, to_business_decision FROM provider_transfer WHERE transfer_id = ? FOR UPDATE",
+                (rs, row) -> new TransferRow(rs.getString("status"), rs.getLong("from_business_id"), rs.getLong("to_business_id"),
+                        rs.getString("from_business_decision"), rs.getString("to_business_decision")), transferId);
         if (rows.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Solicitud de transferencia no encontrada");
         TransferRow transfer = rows.getFirst();
+        long authorizedBusinessId = "SOURCE".equals(side) ? transfer.fromBusinessId() : transfer.toBusinessId();
+        requireBusinessManager(userId, authorizedBusinessId);
         if (!"PENDING".equals(transfer.status())) throw new ResponseStatusException(HttpStatus.CONFLICT, "La solicitud ya fue resuelta");
         String priorDecision = "SOURCE".equals(side) ? transfer.fromDecision() : transfer.toDecision();
         if (priorDecision != null) throw new ResponseStatusException(HttpStatus.CONFLICT, "Este negocio ya registró su decisión");
@@ -68,19 +81,19 @@ public class ProviderTransferService {
             jdbc.update("""
                     UPDATE provider_transfer SET from_business_decision = ?, from_business_decided_at = CURRENT_TIMESTAMP(6),
                         from_business_decided_by_user_id = ? WHERE transfer_id = ?
-                    """, decision, adminUserId, transferId);
+                    """, decision, userId, transferId);
         } else {
             jdbc.update("""
                     UPDATE provider_transfer SET to_business_decision = ?, to_business_decided_at = CURRENT_TIMESTAMP(6),
                         to_business_decided_by_user_id = ? WHERE transfer_id = ?
-                    """, decision, adminUserId, transferId);
+                    """, decision, userId, transferId);
         }
         String nextStatus = "REJECTED".equals(decision) || "REJECTED".equals(priorDecision) ? "REJECTED"
                 : ("APPROVED".equals("SOURCE".equals(side) ? transfer.toDecision() : transfer.fromDecision())
                     ? "WAITING" : null);
         if ("REJECTED".equals(nextStatus)) {
             jdbc.update("UPDATE provider_transfer SET status = ?, resolved_at = CURRENT_TIMESTAMP(6), resolved_by_user_id = ? WHERE transfer_id = ?",
-                    nextStatus, adminUserId, transferId);
+                    nextStatus, userId, transferId);
         } else if ("WAITING".equals(nextStatus)) {
             jdbc.update("""
                     UPDATE provider_transfer
@@ -88,7 +101,7 @@ public class ProviderTransferService {
                         effective_at = DATE_ADD(CURRENT_TIMESTAMP(6), INTERVAL 3 DAY),
                         resolved_at = CURRENT_TIMESTAMP(6), resolved_by_user_id = ?
                     WHERE transfer_id = ?
-                    """, adminUserId, transferId);
+                    """, userId, transferId);
         }
         return getTransfer(transferId);
     }
@@ -143,6 +156,29 @@ public class ProviderTransferService {
         if (count == null || count == 0) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Se requiere un administrador activo");
     }
 
+    private void requireBusinessManager(long userId) {
+        Integer count = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM business_admin ba
+                JOIN app_user u ON u.user_id = ba.user_id
+                JOIN user_role ur ON ur.user_id = u.user_id
+                JOIN role r ON r.role_id = ur.role_id AND r.role_code = 'BUSINESS_ADMIN'
+                WHERE ba.user_id = ? AND ba.revoked_at IS NULL AND u.account_status = 'ACTIVE'
+                """, Integer.class, userId);
+        if (count == null || count == 0) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tiene un negocio asignado para administrar");
+    }
+
+    private void requireBusinessManager(long userId, long businessId) {
+        Integer count = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM business_admin ba
+                JOIN app_user u ON u.user_id = ba.user_id
+                JOIN user_role ur ON ur.user_id = u.user_id
+                JOIN role r ON r.role_id = ur.role_id AND r.role_code = 'BUSINESS_ADMIN'
+                WHERE ba.user_id = ? AND ba.business_id = ? AND ba.revoked_at IS NULL
+                  AND u.account_status = 'ACTIVE'
+                """, Integer.class, userId, businessId);
+        if (count == null || count == 0) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No está autorizado para decidir por este negocio");
+    }
+
     private TransferResponse getTransfer(long id) {
         return jdbc.query(selectTransferSql() + " WHERE t.transfer_id = ?", (rs, row) -> mapTransfer(rs), id)
                 .stream().findFirst().orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Solicitud de transferencia no encontrada"));
@@ -188,7 +224,8 @@ public class ProviderTransferService {
 
     private record ProviderAssignment(long businessId, String status) { }
     private record Business(long id, String name) { }
-    private record TransferRow(String status, String fromDecision, String toDecision) { }
+    private record TransferRow(String status, long fromBusinessId, long toBusinessId,
+                               String fromDecision, String toDecision) { }
     private record WaitingTransfer(long providerUserId, long fromBusinessId, long toBusinessId, String status,
                                    LocalDateTime effectiveAt) { }
     public record TransferResponse(long transferId, long providerUserId, String providerName, String providerEmail,

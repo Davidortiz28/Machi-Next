@@ -15,6 +15,7 @@ services:
       - ./database/002_seed_demo.sql:/docker-entrypoint-initdb.d/002_seed_demo.sql:ro
       - ./database/003_provider_transfer_approvals.sql:/docker-entrypoint-initdb.d/003_provider_transfer_approvals.sql:ro
       - ./database/004_provider_transfer_wait.sql:/docker-entrypoint-initdb.d/004_provider_transfer_wait.sql:ro
+      - ./database/005_business_administrators.sql:/docker-entrypoint-initdb.d/005_business_administrators.sql:ro
     healthcheck:
       test:
         - CMD-SHELL

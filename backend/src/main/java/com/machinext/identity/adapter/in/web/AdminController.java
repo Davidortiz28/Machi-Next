@@ -7,13 +7,13 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -42,6 +42,20 @@ public class AdminController {
         return adminService.createProvider(request.email(), request.password(), request.displayName(), request.businessId());
     }
 
+    @PostMapping("/business-managers")
+    @ResponseStatus(HttpStatus.CREATED)
+    public AdminService.BusinessManagerSummary createBusinessManager(@AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody CreateBusinessManagerRequest request) {
+        return adminService.createBusinessManager(request.email(), request.password(), request.displayName(),
+                request.businessId(), Long.parseLong(jwt.getSubject()));
+    }
+
+    @DeleteMapping("/business-managers/{userId}/businesses/{businessId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void revokeBusinessManager(@PathVariable long userId, @PathVariable long businessId) {
+        adminService.revokeBusinessManager(userId, businessId);
+    }
+
     @GetMapping("/provider-transfers")
     public List<ProviderTransferService.TransferResponse> providerTransfers() { return transferService.list(); }
 
@@ -49,18 +63,6 @@ public class AdminController {
     @ResponseStatus(HttpStatus.CREATED)
     public ProviderTransferService.TransferResponse requestTransfer(@Valid @RequestBody TransferRequest request) {
         return transferService.request(request.providerUserId(), request.toBusinessId());
-    }
-
-    @PostMapping("/provider-transfers/{transferId}/source-decision")
-    public ProviderTransferService.TransferResponse sourceDecision(@AuthenticationPrincipal Jwt jwt,
-            @PathVariable long transferId, @Valid @RequestBody TransferDecision request) {
-        return transferService.decide(transferId, Long.parseLong(jwt.getSubject()), "SOURCE", request.decision());
-    }
-
-    @PostMapping("/provider-transfers/{transferId}/destination-decision")
-    public ProviderTransferService.TransferResponse destinationDecision(@AuthenticationPrincipal Jwt jwt,
-            @PathVariable long transferId, @Valid @RequestBody TransferDecision request) {
-        return transferService.decide(transferId, Long.parseLong(jwt.getSubject()), "DESTINATION", request.decision());
     }
 
     @PostMapping("/provider-transfers/{transferId}/complete")
@@ -77,5 +79,8 @@ public class AdminController {
     public record TransferRequest(@NotNull @Positive Long providerUserId,
                                   @NotNull @Positive Long toBusinessId) { }
 
-    public record TransferDecision(@NotBlank @Pattern(regexp = "APPROVED|REJECTED") String decision) { }
+    public record CreateBusinessManagerRequest(@NotBlank @Email @Size(max = 254) String email,
+                                               @NotBlank @Size(min = 12, max = 72) String password,
+                                               @NotBlank @Size(max = 160) String displayName,
+                                               @NotNull @Positive Long businessId) { }
 }
