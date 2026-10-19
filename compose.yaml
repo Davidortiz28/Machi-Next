@@ -13,6 +13,7 @@ services:
       - machi_mysql_data:/var/lib/mysql
       - ./database/001_schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
       - ./database/002_seed_demo.sql:/docker-entrypoint-initdb.d/002_seed_demo.sql:ro
+      - ./database/003_provider_transfer_approvals.sql:/docker-entrypoint-initdb.d/003_provider_transfer_approvals.sql:ro
     healthcheck:
       test:
         - CMD-SHELL
