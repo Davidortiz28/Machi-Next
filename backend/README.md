@@ -36,6 +36,10 @@ Ejemplo de registro:
 {"email":"cliente@example.com","password":"una-clave-segura","displayName":"Cliente de prueba"}
 ```
 
+## Interfaz web de demostración
+
+Con el backend y MySQL activos, abre `http://localhost:8080/`. La página consume la API en el mismo origen y permite consultar disponibilidad por fechas, crear una cuenta cliente, iniciar sesión, revisar el precio y depósito por separado, confirmar una reserva y ver las reservas de la sesión. El JWT se conserva en `sessionStorage` y se elimina al cerrar la pestaña o salir.
+
 ### Configurar el primer administrador
 
 El primer administrador se crea una sola vez con `POST /api/v1/auth/bootstrap-admin`. El endpoint exige `ADMIN_BOOTSTRAP_TOKEN`, un secreto aleatorio de al menos 32 caracteres. Si ya hay un administrador activo, devuelve conflicto; si el secreto no está configurado o no coincide, rechaza la solicitud. El script de datos demo crea un administrador inactivo, por lo que no bloquea esta inicialización.

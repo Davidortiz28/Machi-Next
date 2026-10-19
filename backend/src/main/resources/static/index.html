@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#173b35">
+  <title>Machi Next — Alquila lo que necesitas</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#inicio" aria-label="Machi Next, inicio">
+      <span class="brand-mark" aria-hidden="true">M</span>
+      <span>Machi<span class="brand-light">Next</span></span>
+    </a>
+    <nav class="top-actions" aria-label="Navegación principal">
+      <a class="nav-link" href="#catalogo">Explorar herramientas</a>
+      <button class="button button-quiet" id="my-reservations-link" type="button" hidden>Mis reservas</button>
+      <button class="button button-outline" id="auth-open" type="button">Ingresar</button>
+      <button class="button button-quiet account-name" id="sign-out" type="button" hidden></button>
+    </nav>
+  </header>
+
+  <main id="inicio">
+    <section class="hero wrap">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="eyebrow-dot"></span> Herramientas listas para tu próximo proyecto</p>
+        <h1>Haz más.<br><span>Compra menos.</span></h1>
+        <p class="hero-text">Encuentra herramientas confiables cerca de ti y réntalas por los días que realmente las necesitas.</p>
+        <a class="button button-primary" href="#catalogo">Ver herramientas <span aria-hidden="true">↘</span></a>
+        <div class="hero-note"><span aria-hidden="true">✦</span> Plataforma académica de demostración</div>
+      </div>
+      <div class="hero-art" aria-label="Ilustración decorativa de una herramienta">
+        <div class="sun"></div>
+        <div class="orbit orbit-one"></div>
+        <div class="orbit orbit-two"></div>
+        <div class="tool-card">
+          <span class="tool-label">LISTA PARA USAR</span>
+          <div class="drill" aria-hidden="true"><span class="drill-bit"></span><span class="drill-body"></span><span class="drill-handle"></span><span class="drill-grip"></span></div>
+          <span class="tool-caption">Tu próximo proyecto<br>empieza aquí.</span>
+        </div>
+        <span class="art-spark spark-a">✳</span><span class="art-spark spark-b">✦</span>
+        <span class="art-ring"></span>
+      </div>
+    </section>
+
+    <section class="catalog-section" id="catalogo">
+      <div class="wrap">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">CATÁLOGO DISPONIBLE</p>
+            <h2>Encuentra tu herramienta</h2>
+            <p class="muted">Elige tus fechas para consultar disponibilidad y precio.</p>
+          </div>
+          <span class="catalog-count" id="catalog-count">Cargando…</span>
+        </div>
+
+        <form class="search-panel" id="availability-form">
+          <label class="date-field"><span>Fecha de inicio</span><input id="start-date" name="startDate" type="date" required></label>
+          <span class="date-divider" aria-hidden="true">→</span>
+          <label class="date-field"><span>Fecha de devolución</span><input id="return-date" name="returnDate" type="date" required></label>
+          <button class="button button-primary search-button" type="submit"><span aria-hidden="true">⌕</span> Buscar disponibilidad</button>
+        </form>
+
+        <div class="status-line" id="catalog-status" role="status" aria-live="polite"></div>
+        <div class="equipment-grid" id="equipment-grid" aria-live="polite"></div>
+        <div class="empty-state" id="empty-state" hidden>
+          <span class="empty-icon" aria-hidden="true">⌕</span>
+          <h3>No encontramos equipos disponibles</h3>
+          <p>Prueba con otras fechas para ver más opciones.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="steps-section wrap">
+      <div class="section-heading">
+        <div><p class="eyebrow">ASÍ DE FÁCIL</p><h2>Tu proyecto, en tres pasos</h2></div>
+      </div>
+      <div class="steps-grid">
+        <article class="step-card"><span class="step-number">01</span><h3>Elige</h3><p>Busca el equipo que necesitas y selecciona tus fechas.</p></article>
+        <article class="step-card"><span class="step-number">02</span><h3>Reserva</h3><p>Confirma tu reserva con el precio y depósito a la vista.</p></article>
+        <article class="step-card"><span class="step-number">03</span><h3>Construye</h3><p>Recoge la herramienta y ponte manos a la obra.</p></article>
+      </div>
+    </section>
+
+    <section class="reservations-section wrap" id="my-reservations" hidden>
+      <div class="section-heading"><div><p class="eyebrow">TU ACTIVIDAD</p><h2>Mis reservas</h2></div></div>
+      <div class="reservation-list" id="reservation-list"></div>
+    </section>
+  </main>
+
+  <footer class="footer"><div class="wrap footer-inner"><a class="brand footer-brand" href="#inicio"><span class="brand-mark" aria-hidden="true">M</span><span>Machi<span class="brand-light">Next</span></span></a><span>Una experiencia académica de demostración</span><a href="#catalogo">Volver al catálogo ↑</a></div></footer>
+
+  <dialog class="auth-dialog" id="auth-dialog" aria-labelledby="auth-title">
+    <button class="dialog-close" id="auth-close" type="button" aria-label="Cerrar">×</button>
+    <p class="eyebrow">BIENVENIDO A MACHINEXT</p>
+    <h2 id="auth-title">Tu proyecto te espera</h2>
+    <div class="auth-tabs" role="tablist" aria-label="Acceso a tu cuenta">
+      <button class="auth-tab is-active" id="login-tab" type="button" role="tab" aria-selected="true">Ingresar</button>
+      <button class="auth-tab" id="register-tab" type="button" role="tab" aria-selected="false">Crear cuenta</button>
+    </div>
+    <form id="login-form" class="auth-form">
+      <label>Correo electrónico<input name="email" type="email" autocomplete="email" required maxlength="254"></label>
+      <label>Contraseña<input name="password" type="password" autocomplete="current-password" required></label>
+      <button class="button button-primary button-full" type="submit">Ingresar</button>
+    </form>
+    <form id="register-form" class="auth-form" hidden>
+      <label>Nombre completo<input name="displayName" type="text" autocomplete="name" required maxlength="160"></label>
+      <label>Correo electrónico<input name="email" type="email" autocomplete="email" required maxlength="254"></label>
+      <label>Contraseña<input name="password" type="password" autocomplete="new-password" required minlength="8" maxlength="72"></label>
+      <button class="button button-primary button-full" type="submit">Crear cuenta</button>
+    </form>
+    <p class="auth-message" id="auth-message" role="alert"></p>
+    <p class="privacy-note">Tu sesión se conserva solo en esta pestaña.</p>
+  </dialog>
+
+  <dialog class="auth-dialog confirmation-dialog" id="booking-dialog" aria-labelledby="booking-title">
+    <button class="dialog-close" id="booking-close" type="button" aria-label="Cerrar">×</button>
+    <p class="eyebrow">RESUMEN DE RESERVA</p>
+    <h2 id="booking-title">Confirma tu equipo</h2>
+    <div id="booking-summary" class="booking-summary"></div>
+    <p class="privacy-note">El depósito se muestra por separado y se devuelve al registrar la devolución sin daños.</p>
+    <button class="button button-primary button-full" id="booking-confirm" type="button">Confirmar reserva</button>
+    <p class="auth-message" id="booking-message" role="alert"></p>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
