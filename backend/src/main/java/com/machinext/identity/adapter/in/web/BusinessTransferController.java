@@ -23,7 +23,7 @@ public class BusinessTransferController {
     public BusinessTransferController(ProviderTransferService transferService) { this.transferService = transferService; }
 
     @GetMapping
-    public List<ProviderTransferService.TransferResponse> list(@AuthenticationPrincipal Jwt jwt) {
+    public List<ProviderTransferService.BusinessManagerTransferResponse> list(@AuthenticationPrincipal Jwt jwt) {
         return transferService.listForBusinessManager(Long.parseLong(jwt.getSubject()));
     }
 

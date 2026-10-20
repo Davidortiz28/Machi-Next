@@ -53,15 +53,16 @@ public class ProviderTransferService {
                 (rs, row) -> mapTransfer(rs));
     }
 
-    public List<TransferResponse> listForBusinessManager(long userId) {
+    public List<BusinessManagerTransferResponse> listForBusinessManager(long userId) {
         requireBusinessManager(userId);
-        return jdbc.query(selectTransferSql() + """
+        return jdbc.query(selectTransferSqlForBusinessManager() + """
                  WHERE EXISTS (
                     SELECT 1 FROM business_admin ba
                     WHERE ba.user_id = ? AND ba.revoked_at IS NULL
                       AND ba.business_id IN (t.from_business_id, t.to_business_id)
                  ) ORDER BY t.requested_at DESC
-                """, (rs, row) -> mapTransfer(rs), userId);
+                """, (rs, row) -> new BusinessManagerTransferResponse(mapTransfer(rs),
+                rs.getBoolean("can_decide_source"), rs.getBoolean("can_decide_destination")), userId, userId, userId);
     }
 
     @Transactional
@@ -209,6 +210,30 @@ public class ProviderTransferService {
                 """;
     }
 
+    private String selectTransferSqlForBusinessManager() {
+        return """
+                SELECT t.transfer_id, t.provider_user_id, u.display_name AS provider_name, u.email AS provider_email,
+                       t.from_business_id, fb.legal_name AS from_business_name,
+                       t.to_business_id, tb.legal_name AS to_business_name,
+                       t.requested_at, t.status, t.from_business_decision, t.from_business_decided_at,
+                       t.from_business_decided_by_user_id, t.to_business_decision, t.to_business_decided_at,
+                       t.to_business_decided_by_user_id, t.approved_at, t.effective_at, t.completed_at,
+                       t.completed_by_user_id, t.completion_method,
+                       (t.status = 'PENDING' AND t.from_business_decision IS NULL AND EXISTS (
+                           SELECT 1 FROM business_admin ba WHERE ba.user_id = ? AND ba.revoked_at IS NULL
+                             AND ba.business_id = t.from_business_id
+                       )) AS can_decide_source,
+                       (t.status = 'PENDING' AND t.to_business_decision IS NULL AND EXISTS (
+                           SELECT 1 FROM business_admin ba WHERE ba.user_id = ? AND ba.revoked_at IS NULL
+                             AND ba.business_id = t.to_business_id
+                       )) AS can_decide_destination
+                FROM provider_transfer t
+                JOIN app_user u ON u.user_id = t.provider_user_id
+                JOIN business fb ON fb.business_id = t.from_business_id
+                JOIN business tb ON tb.business_id = t.to_business_id
+                """;
+    }
+
     private TransferResponse mapTransfer(java.sql.ResultSet rs) throws java.sql.SQLException {
         return new TransferResponse(rs.getLong("transfer_id"), rs.getLong("provider_user_id"),
                 rs.getString("provider_name"), rs.getString("provider_email"), rs.getLong("from_business_id"),
@@ -244,4 +269,6 @@ public class ProviderTransferService {
                                    String toBusinessDecision, LocalDateTime toBusinessDecidedAt,
                                    Long toBusinessDecidedByUserId, LocalDateTime approvedAt, LocalDateTime effectiveAt,
                                    LocalDateTime completedAt, Long completedByUserId, String completionMethod) { }
+    public record BusinessManagerTransferResponse(TransferResponse transfer, boolean canDecideSource,
+                                                  boolean canDecideDestination) { }
 }

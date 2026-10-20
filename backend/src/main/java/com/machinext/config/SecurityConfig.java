@@ -16,7 +16,7 @@ public class SecurityConfig {
         return http
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
-                        .requestMatchers("/", "/index.html", "/styles.css", "/app.js", "/provider.html", "/provider.css", "/provider.js", "/admin.html", "/admin.css", "/admin.js").permitAll()
+                        .requestMatchers("/", "/index.html", "/styles.css", "/app.js", "/provider.html", "/provider.css", "/provider.js", "/admin.html", "/admin.css", "/admin.js", "/business.html", "/business.css", "/business.js").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/catalog/equipment").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/catalog/equipment/availability").permitAll()
                         .requestMatchers("/api/v1/auth/**").permitAll()
