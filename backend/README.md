@@ -42,11 +42,17 @@ Con el backend y MySQL activos, abre `http://localhost:8080/`. La página consum
 
 Las cuentas `PROVEEDOR` pueden abrir `/provider.html` después de iniciar sesión en el catálogo. El panel muestra los equipos del negocio que tienen asignado y permite registrar equipos con tarifa y depósito, además de cambiar su estado entre `AVAILABLE`, `MAINTENANCE` y `RETIRED`. Un proveedor sin asignación vigente no puede consultar ni modificar inventario.
 
+El mismo panel permite consultar reservas del negocio y registrar la entrega de una reserva confirmada. Al recibir el equipo, el proveedor registra si está en buen estado o si tiene daño parcial o total. Un daño deja el depósito pendiente y el proveedor que hizo la entrega puede adjuntar evidencia JPG, PNG, MP4 o PDF desde la reserva.
+
 La API de inventario requiere un JWT con rol `PROVEEDOR` y obtiene el negocio exclusivamente de la asignación vigente del usuario:
 
 - `GET /api/v1/provider/equipment` lista los equipos y su última tarifa registrada.
 - `POST /api/v1/provider/equipment` registra `categoryName`, `manufacturer`, `modelName`, `serialNumber`, `dailyAmount`, `depositAmount` y `validFrom`; acepta también `description`, `currency` (por defecto `COP`) y `validTo` opcional.
 - `PATCH /api/v1/provider/equipment/{equipmentId}/status` actualiza el estado con `{"status":"MAINTENANCE"}` (también acepta `AVAILABLE` o `RETIRED`).
+- `GET /api/v1/provider/rentals` lista las reservas y alquileres del negocio asignado.
+- `POST /api/v1/rentals/{reservationId}/handover` registra la entrega de una reserva confirmada.
+- `POST /api/v1/rentals/{reservationId}/return` registra la devolución con `{"condition":"GOOD"}`, `{"condition":"PARTIAL_DAMAGE"}` o `{"condition":"TOTAL_DAMAGE"}`.
+- `POST /api/v1/rentals/{reservationId}/damage-evidence` carga la evidencia con `multipart/form-data`, campo `file`; solo la persona que registró la entrega puede adjuntarla.
 
 El número de serie debe ser único dentro del negocio. La misma categoría y modelo se reutilizan al registrar unidades adicionales. Las tarifas y el inventario se guardan en las tablas existentes, y las nuevas unidades comienzan como `AVAILABLE`.
 

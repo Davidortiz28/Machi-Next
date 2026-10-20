@@ -104,6 +104,44 @@ public class ReservationService {
                 rs.getBigDecimal("deposit_snapshot"), rs.getString("currency")), customerId);
     }
 
+    public List<ProviderRentalResponse> listForProvider(long providerId) {
+        List<Long> businessIds = jdbc.query("""
+                SELECT a.business_id FROM provider_assignment a
+                JOIN business b ON b.business_id = a.business_id
+                JOIN app_user u ON u.user_id = a.provider_user_id AND u.account_status = 'ACTIVE'
+                JOIN user_role ur ON ur.user_id = u.user_id
+                JOIN role ro ON ro.role_id = ur.role_id AND ro.role_code = 'PROVEEDOR'
+                WHERE a.provider_user_id = ? AND a.ended_at IS NULL AND b.status = 'ACTIVE'
+                """, (rs, rowNum) -> rs.getLong("business_id"), providerId);
+        if (businessIds.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes un negocio activo asignado");
+        }
+        long businessId = businessIds.getFirst();
+        return jdbc.query("""
+                SELECT r.reservation_id, ri.equipment_id, r.status, ri.start_date, ri.return_date,
+                       DATEDIFF(ri.return_date, ri.start_date) + 1 AS calendar_days,
+                       ri.rental_amount_snapshot, ri.deposit_snapshot, dr.currency,
+                       u.display_name AS customer_name, em.manufacturer, em.model_name,
+                       re.return_condition, re.handed_over_by_user_id
+                FROM reservation r
+                JOIN reservation_item ri ON ri.reservation_id = r.reservation_id
+                JOIN daily_rate dr ON dr.equipment_id = ri.equipment_id AND dr.rate_id = ri.rate_id
+                JOIN equipment_unit eu ON eu.equipment_id = ri.equipment_id
+                JOIN equipment_model em ON em.model_id = eu.model_id
+                JOIN app_user u ON u.user_id = r.customer_user_id
+                LEFT JOIN rental re ON re.reservation_item_id = ri.reservation_item_id
+                WHERE r.business_id = ?
+                ORDER BY CASE r.status WHEN 'IN_RENTAL' THEN 0 WHEN 'CONFIRMED' THEN 1 ELSE 2 END,
+                         ri.start_date DESC, r.reservation_id DESC
+                """, (rs, rowNum) -> new ProviderRentalResponse(rs.getLong("reservation_id"),
+                rs.getLong("equipment_id"), rs.getString("status"), rs.getDate("start_date").toLocalDate(),
+                rs.getDate("return_date").toLocalDate(), rs.getLong("calendar_days"),
+                rs.getBigDecimal("rental_amount_snapshot"), rs.getBigDecimal("deposit_snapshot"),
+                rs.getString("currency"), rs.getString("customer_name"), rs.getString("manufacturer"),
+                rs.getString("model_name"), rs.getString("return_condition"),
+                (Long) rs.getObject("handed_over_by_user_id")), businessId);
+    }
+
     @Transactional
     public CancellationResponse cancel(long customerId, long reservationId, String reason) {
         List<CancellationData> rows = jdbc.query("""
@@ -380,6 +418,12 @@ public class ReservationService {
                                       LocalDate startDate, LocalDate returnDate, long calendarDays,
                                       BigDecimal dailyAmount, BigDecimal rentalAmount, BigDecimal depositAmount,
                                       String currency) { }
+
+    public record ProviderRentalResponse(long reservationId, long equipmentId, String status,
+                                         LocalDate startDate, LocalDate returnDate, long calendarDays,
+                                         BigDecimal rentalAmount, BigDecimal depositAmount, String currency,
+                                         String customerName, String manufacturer, String modelName,
+                                         String returnCondition, Long handedOverByUserId) { }
 
     public record CancellationResponse(long reservationId, String status, int refundPercent,
                                        BigDecimal refundAmount, String currency) { }

@@ -168,7 +168,7 @@
 
   const saveSession = (auth) => {
     sessionStorage.setItem(tokenKey, auth.accessToken);
-    sessionStorage.setItem(userKey, JSON.stringify({ displayName: auth.displayName, email: auth.email, roles: auth.roles || [] }));
+    sessionStorage.setItem(userKey, JSON.stringify({ userId: auth.userId, displayName: auth.displayName, email: auth.email, roles: auth.roles || [] }));
     updateSessionUI();
     authDialog.close();
     showToast(`¡Hola, ${auth.displayName}! Ya puedes reservar.`);
