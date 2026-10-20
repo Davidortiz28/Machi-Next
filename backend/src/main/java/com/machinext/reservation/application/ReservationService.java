@@ -84,14 +84,18 @@ public class ReservationService {
         recordPayment(reservationId, "DEPOSIT_CHARGE", "reservation:" + reservationId + ":deposit:charge",
                 rate.depositAmount(), rate.currency());
         return new ReservationResponse(reservationId, equipmentId, "CONFIRMED", startDate, returnDate,
-                period.calendarDaysInclusive(), rate.dailyAmount(), rentalAmount, rate.depositAmount(), rate.currency());
+                period.calendarDaysInclusive(), rate.dailyAmount(), rentalAmount, rate.depositAmount(), rate.currency(), null, null);
     }
 
     public List<ReservationResponse> listForCustomer(long customerId) {
         return jdbc.query("""
                 SELECT r.reservation_id, ri.equipment_id, r.status, ri.start_date, ri.return_date,
                        DATEDIFF(ri.return_date, ri.start_date) + 1 AS calendar_days,
-                       ri.daily_amount_snapshot, ri.rental_amount_snapshot, ri.deposit_snapshot, dr.currency
+                       ri.daily_amount_snapshot, ri.rental_amount_snapshot, ri.deposit_snapshot, dr.currency,
+                       r.refund_percent,
+                       (SELECT COALESCE(SUM(po.amount), 0) FROM payment_operation po
+                        WHERE po.reservation_id = r.reservation_id
+                          AND po.operation_type IN ('RENT_REFUND', 'DEPOSIT_REFUND')) AS refund_amount
                 FROM reservation r
                 JOIN reservation_item ri ON ri.reservation_id = r.reservation_id
                 JOIN daily_rate dr ON dr.equipment_id = ri.equipment_id AND dr.rate_id = ri.rate_id
@@ -101,7 +105,8 @@ public class ReservationService {
                 rs.getLong("equipment_id"), rs.getString("status"), rs.getDate("start_date").toLocalDate(),
                 rs.getDate("return_date").toLocalDate(), rs.getLong("calendar_days"),
                 rs.getBigDecimal("daily_amount_snapshot"), rs.getBigDecimal("rental_amount_snapshot"),
-                rs.getBigDecimal("deposit_snapshot"), rs.getString("currency")), customerId);
+                rs.getBigDecimal("deposit_snapshot"), rs.getString("currency"),
+                (Integer) rs.getObject("refund_percent"), rs.getBigDecimal("refund_amount")), customerId);
     }
 
     public List<ProviderRentalResponse> listForProvider(long providerId) {
@@ -417,7 +422,7 @@ public class ReservationService {
     public record ReservationResponse(long reservationId, long equipmentId, String status,
                                       LocalDate startDate, LocalDate returnDate, long calendarDays,
                                       BigDecimal dailyAmount, BigDecimal rentalAmount, BigDecimal depositAmount,
-                                      String currency) { }
+                                      String currency, Integer refundPercent, BigDecimal refundAmount) { }
 
     public record ProviderRentalResponse(long reservationId, long equipmentId, String status,
                                          LocalDate startDate, LocalDate returnDate, long calendarDays,

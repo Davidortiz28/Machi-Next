@@ -40,6 +40,8 @@ Ejemplo de registro:
 
 Con el backend y MySQL activos, abre `http://localhost:8080/`. La página consume la API en el mismo origen y permite consultar disponibilidad por fechas, crear una cuenta cliente, iniciar sesión, revisar el precio y depósito por separado, confirmar una reserva y ver las reservas de la sesión. El JWT se conserva en `sessionStorage` y se elimina al cerrar la pestaña o salir.
 
+En **Mis reservas**, un cliente puede cancelar una reserva confirmada. El servidor calcula y registra el reembolso simulado según la anticipación; la lista conserva el porcentaje e importe devueltos para consultar la cancelación después.
+
 Las cuentas `PROVEEDOR` pueden abrir `/provider.html` después de iniciar sesión en el catálogo. El panel muestra los equipos del negocio que tienen asignado y permite registrar equipos con tarifa y depósito, además de cambiar su estado entre `AVAILABLE`, `MAINTENANCE` y `RETIRED`. Un proveedor sin asignación vigente no puede consultar ni modificar inventario.
 
 El mismo panel permite consultar reservas del negocio y registrar la entrega de una reserva confirmada. Al recibir el equipo, el proveedor registra si está en buen estado o si tiene daño parcial o total. Un daño deja el depósito pendiente y el proveedor que hizo la entrega puede adjuntar evidencia JPG, PNG, MP4 o PDF desde la reserva.

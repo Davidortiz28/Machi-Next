@@ -1,0 +1,1 @@
+.reservation-item{flex-wrap:wrap}.reservation-cancel{white-space:nowrap}.reservation-amount{min-width:160px}.reservation-item .reservation-cancel{margin-left:auto}@media(max-width:580px){.reservation-item .reservation-cancel{margin-left:0}.reservation-amount{text-align:left}}

@@ -158,8 +158,9 @@
     const loggedIn = Boolean(sessionStorage.getItem(tokenKey) && user);
     document.querySelector("#auth-open").hidden = loggedIn;
     document.querySelector("#sign-out").hidden = !loggedIn;
-    document.querySelector("#my-reservations-link").hidden = !loggedIn;
-    document.querySelector("#my-reservations").hidden = !loggedIn;
+    const isCustomer = loggedIn && user.roles?.includes("CLIENTE");
+    document.querySelector("#my-reservations-link").hidden = !isCustomer;
+    document.querySelector("#my-reservations").hidden = !isCustomer;
     document.querySelector("#provider-dashboard-link").hidden = !loggedIn || !user.roles?.includes("PROVEEDOR");
     document.querySelector("#admin-dashboard-link").hidden = !loggedIn || !user.roles?.includes("ADMIN");
     document.querySelector("#business-dashboard-link").hidden = !loggedIn || !user.roles?.includes("BUSINESS_ADMIN");
@@ -220,7 +221,8 @@
   };
 
   const loadReservations = async () => {
-    if (!sessionStorage.getItem(tokenKey)) return;
+    const user = JSON.parse(sessionStorage.getItem(userKey) || "null");
+    if (!sessionStorage.getItem(tokenKey) || !user?.roles?.includes("CLIENTE")) return;
     const list = document.querySelector("#reservation-list");
     try {
       const reservations = await api("/api/v1/reservations");
@@ -237,7 +239,27 @@
         const amount = element("div", "reservation-amount");
         amount.append(document.createTextNode(money(reservation.rentalAmount, reservation.currency)));
         amount.append(element("small", "", `Depósito: ${money(reservation.depositAmount, reservation.currency)}`));
+        if (reservation.status === "CANCELLED" && reservation.refundAmount !== null) {
+          amount.append(element("small", "", `Reembolso simulado (${reservation.refundPercent}%): ${money(reservation.refundAmount, reservation.currency)}`));
+        }
         item.append(details, amount);
+        if (reservation.status === "CONFIRMED") {
+          const cancelButton = element("button", "button button-outline reservation-cancel", "Cancelar reserva");
+          cancelButton.type = "button";
+          cancelButton.addEventListener("click", async () => {
+            if (!window.confirm("¿Quieres cancelar esta reserva? El sistema calculará el reembolso según la anticipación.")) return;
+            cancelButton.disabled = true;
+            try {
+              const cancellation = await api(`/api/v1/reservations/${reservation.reservationId}/cancel`, {
+                method: "POST", body: JSON.stringify({ reason: "Cancelada por el cliente" })
+              });
+              showToast(`Reserva cancelada. Reembolso simulado: ${money(cancellation.refundAmount, cancellation.currency)} (${cancellation.refundPercent}%).`);
+              await loadReservations();
+              await loadAvailability();
+            } catch (error) { showToast(error.message, true); cancelButton.disabled = false; }
+          });
+          item.append(cancelButton);
+        }
         list.append(item);
       }
     } catch (error) {
