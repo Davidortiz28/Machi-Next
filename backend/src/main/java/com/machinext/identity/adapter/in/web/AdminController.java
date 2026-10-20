@@ -36,6 +36,9 @@ public class AdminController {
     @GetMapping("/businesses")
     public List<AdminService.BusinessSummary> businesses() { return adminService.listBusinesses(); }
 
+    @GetMapping("/providers")
+    public List<AdminService.ProviderAccountSummary> providers() { return adminService.listProviders(); }
+
     @PostMapping("/providers")
     @ResponseStatus(HttpStatus.CREATED)
     public AdminService.ProviderSummary createProvider(@Valid @RequestBody CreateProviderRequest request) {

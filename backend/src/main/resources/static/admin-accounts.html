@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gestión de negocios · Machi Next</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/admin-accounts.css">
+  <script src="/admin-accounts.js" defer></script>
+</head>
+<body>
+  <header class="site-header"><a class="brand" href="/">Machi<span>Next</span></a><nav class="top-actions"><a class="nav-link" href="/admin.html">Revisar daños</a><a class="nav-link" href="/">Volver al catálogo</a></nav></header>
+  <main class="accounts-main">
+    <section class="accounts-heading"><p class="eyebrow">ADMINISTRACIÓN GLOBAL</p><h1>Negocios y proveedores</h1><p>Crea cuentas operativas y gestiona las transferencias de proveedores.</p><p id="accounts-status" role="status"></p></section>
+    <div id="accounts-content" hidden>
+      <section class="accounts-panel"><h2>Crear proveedor</h2><form id="provider-form" class="accounts-form">
+        <label>Nombre<input name="displayName" maxlength="160" required></label><label>Correo<input name="email" type="email" maxlength="254" required></label>
+        <label>Contraseña inicial<input name="password" type="password" minlength="12" maxlength="72" autocomplete="new-password" required></label><label>Negocio<input name="businessId" list="business-options" required placeholder="Selecciona un negocio activo"></label>
+        <datalist id="business-options"></datalist><div class="wide"><button class="button button-primary" type="submit">Crear proveedor</button><span class="form-status" role="status"></span></div>
+      </form></section>
+      <section class="accounts-panel"><h2>Crear representante de negocio</h2><form id="manager-form" class="accounts-form">
+        <label>Nombre<input name="displayName" maxlength="160" required></label><label>Correo<input name="email" type="email" maxlength="254" required></label>
+        <label>Contraseña inicial<input name="password" type="password" minlength="12" maxlength="72" autocomplete="new-password" required></label><label>Negocio<input name="businessId" list="business-options" required placeholder="Selecciona un negocio activo"></label>
+        <div class="wide"><button class="button button-primary" type="submit">Crear representante</button><span class="form-status" role="status"></span></div>
+      </form></section>
+      <section class="accounts-panel"><div class="panel-heading"><div><h2>Proveedores</h2><p>Elige uno con asignación vigente para iniciar una transferencia.</p></div><button id="refresh-data" class="button button-outline" type="button">Actualizar</button></div><div id="provider-list" class="provider-list"></div></section>
+      <section class="accounts-panel"><h2>Solicitar transferencia</h2><form id="transfer-form" class="accounts-form">
+        <label>Proveedor<select name="providerUserId" required></select></label><label>Negocio de destino<select name="toBusinessId" required></select></label>
+        <div class="wide"><button class="button button-primary" type="submit">Enviar solicitud</button><span id="transfer-form-status" class="form-status" role="status"></span></div>
+      </form></section>
+      <section class="accounts-panel"><div class="panel-heading"><div><h2>Historial de transferencias</h2><p id="transfer-list-status"></p></div></div><div id="transfer-list" class="transfer-list"></div></section>
+    </div>
+  </main>
+</body>
+</html>

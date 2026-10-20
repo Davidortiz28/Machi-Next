@@ -26,6 +26,21 @@ public class AdminService {
                 (rs, row) -> new BusinessSummary(rs.getLong("business_id"), rs.getString("legal_name"), rs.getString("status")));
     }
 
+    public List<ProviderAccountSummary> listProviders() {
+        return jdbc.query("""
+                SELECT u.user_id, u.email, u.display_name, u.account_status,
+                       a.business_id, b.legal_name AS business_name, b.status AS business_status
+                FROM app_user u
+                JOIN user_role ur ON ur.user_id = u.user_id
+                JOIN role r ON r.role_id = ur.role_id AND r.role_code = 'PROVEEDOR'
+                LEFT JOIN provider_assignment a ON a.provider_user_id = u.user_id AND a.ended_at IS NULL
+                LEFT JOIN business b ON b.business_id = a.business_id
+                ORDER BY u.display_name, u.user_id
+                """, (rs, row) -> new ProviderAccountSummary(rs.getLong("user_id"), rs.getString("email"),
+                rs.getString("display_name"), rs.getString("account_status"),
+                (Long) rs.getObject("business_id"), rs.getString("business_name"), rs.getString("business_status")));
+    }
+
     @Transactional
     public ProviderSummary createProvider(String email, String password, String displayName, Long businessId) {
         BusinessSummary business = jdbc.query("SELECT business_id, legal_name, status FROM business WHERE business_id = ?",
@@ -86,5 +101,7 @@ public class AdminService {
 
     public record BusinessSummary(Long businessId, String legalName, String status) { }
     public record ProviderSummary(Long userId, String email, String displayName, BusinessSummary business, String status) { }
+    public record ProviderAccountSummary(Long userId, String email, String displayName, String accountStatus,
+                                         Long businessId, String businessName, String businessStatus) { }
     public record BusinessManagerSummary(Long userId, String email, String displayName, BusinessSummary business) { }
 }

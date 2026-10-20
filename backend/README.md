@@ -147,6 +147,8 @@ Un administrador revisa los casos en `GET /api/v1/admin/damage-reports`, consult
 
 La interfaz web del administrador está en `/admin.html` y se enlaza desde el catálogo al iniciar sesión con rol `ADMIN`. Presenta los reportes pendientes, previsualiza imágenes, video y PDF, y permite aprobar o rechazar la retención del depósito.
 
+La gestión de cuentas y transferencias está en `/admin-accounts.html`, accesible desde la pantalla de revisión de daños. Permite crear cuentas de proveedor y representantes vinculados a negocios activos, consultar proveedores y transferencias, e iniciar solicitudes. El endpoint administrativo `GET /api/v1/admin/providers` lista proveedores y asignación vigente para alimentar ese panel. Los representantes registran sus dos decisiones en `/business.html`; el proveedor conserva el negocio actual durante los 3 días de espera y la transferencia se completa automáticamente cuando vence el plazo.
+
 ## Arquitectura
 
 El paquete base solo contiene el punto de entrada de Spring Boot. Los módulos de negocio se añadirán por contexto (`identity`, `businesses`, `catalog`, `rentals`, `payments` y `reports`), separando dominio y aplicación de los adaptadores web y de persistencia. Así las reglas de negocio no dependerán de Spring MVC ni de JPA.
