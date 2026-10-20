@@ -145,6 +145,8 @@ Una devolución `GOOD` registra un reembolso simulado por el total del depósito
 
 Un administrador revisa los casos en `GET /api/v1/admin/damage-reports`, consulta evidencias en `GET /api/v1/admin/damage-reports/{reportId}/evidence` y las descarga o visualiza en `GET /api/v1/admin/damage-reports/{reportId}/evidence/{evidenceId}/content`. Para resolver un reporte usa `POST /api/v1/admin/damage-reports/{reportId}/review` con `{"decision":"APPROVE","assessedAmount":40000,"retainedAmount":30000,"decisionNote":"Daño parcial verificado"}`. La retención no puede exceder el daño evaluado ni el depósito; el saldo se registra como reembolso simulado. Con `REJECT`, el depósito completo se registra para devolución. Se requiere al menos una evidencia antes de la revisión.
 
+La interfaz web del administrador está en `/admin.html` y se enlaza desde el catálogo al iniciar sesión con rol `ADMIN`. Presenta los reportes pendientes, previsualiza imágenes, video y PDF, y permite aprobar o rechazar la retención del depósito.
+
 ## Arquitectura
 
 El paquete base solo contiene el punto de entrada de Spring Boot. Los módulos de negocio se añadirán por contexto (`identity`, `businesses`, `catalog`, `rentals`, `payments` y `reports`), separando dominio y aplicación de los adaptadores web y de persistencia. Así las reglas de negocio no dependerán de Spring MVC ni de JPA.

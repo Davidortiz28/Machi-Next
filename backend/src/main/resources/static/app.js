@@ -161,6 +161,7 @@
     document.querySelector("#my-reservations-link").hidden = !loggedIn;
     document.querySelector("#my-reservations").hidden = !loggedIn;
     document.querySelector("#provider-dashboard-link").hidden = !loggedIn || !user.roles?.includes("PROVEEDOR");
+    document.querySelector("#admin-dashboard-link").hidden = !loggedIn || !user.roles?.includes("ADMIN");
     if (loggedIn) {
       document.querySelector("#sign-out").textContent = user.displayName || user.email;
     }
