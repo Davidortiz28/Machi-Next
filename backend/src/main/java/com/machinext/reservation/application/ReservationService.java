@@ -83,6 +83,11 @@ public class ReservationService {
                 rentalAmount, rate.currency());
         recordPayment(reservationId, "DEPOSIT_CHARGE", "reservation:" + reservationId + ":deposit:charge",
                 rate.depositAmount(), rate.currency());
+        String invoiceNumber = "MN-" + rate.businessId() + "-" + reservationId;
+        jdbc.update("""
+                INSERT INTO invoice (business_id, reservation_id, invoice_number, total_amount, currency, status)
+                VALUES (?, ?, ?, ?, ?, 'ISSUED')
+                """, rate.businessId(), reservationId, invoiceNumber, rentalAmount.add(rate.depositAmount()), rate.currency());
         return new ReservationResponse(reservationId, equipmentId, "CONFIRMED", startDate, returnDate,
                 period.calendarDaysInclusive(), rate.dailyAmount(), rentalAmount, rate.depositAmount(), rate.currency(), null, null);
     }
@@ -107,6 +112,48 @@ public class ReservationService {
                 rs.getBigDecimal("daily_amount_snapshot"), rs.getBigDecimal("rental_amount_snapshot"),
                 rs.getBigDecimal("deposit_snapshot"), rs.getString("currency"),
                 (Integer) rs.getObject("refund_percent"), rs.getBigDecimal("refund_amount")), customerId);
+    }
+
+    public InvoiceResponse findInvoiceForCustomer(long customerId, long reservationId) {
+        List<InvoiceResponse> invoices = jdbc.query("""
+                SELECT i.invoice_id, i.invoice_number, i.status AS invoice_status, i.issued_at,
+                       i.total_amount, i.currency, b.business_id, b.legal_name AS business_name,
+                       u.display_name AS customer_name, u.email AS customer_email,
+                       r.reservation_id, r.status AS reservation_status, ri.equipment_id,
+                       ri.start_date, ri.return_date, DATEDIFF(ri.return_date, ri.start_date) + 1 AS calendar_days,
+                       ri.daily_amount_snapshot, ri.rental_amount_snapshot, ri.deposit_snapshot,
+                       em.manufacturer, em.model_name, eu.serial_number
+                FROM invoice i
+                JOIN reservation r ON r.reservation_id = i.reservation_id
+                JOIN reservation_item ri ON ri.reservation_id = r.reservation_id
+                JOIN business b ON b.business_id = i.business_id
+                JOIN app_user u ON u.user_id = r.customer_user_id
+                JOIN equipment_unit eu ON eu.equipment_id = ri.equipment_id
+                JOIN equipment_model em ON em.model_id = eu.model_id
+                WHERE r.reservation_id = ? AND r.customer_user_id = ?
+                """, (rs, row) -> new InvoiceResponse(rs.getLong("invoice_id"), rs.getString("invoice_number"),
+                rs.getString("invoice_status"), rs.getTimestamp("issued_at").toLocalDateTime(),
+                rs.getLong("business_id"), rs.getString("business_name"), rs.getString("customer_name"),
+                rs.getString("customer_email"), rs.getLong("reservation_id"), rs.getString("reservation_status"),
+                rs.getLong("equipment_id"), rs.getString("manufacturer"), rs.getString("model_name"),
+                rs.getString("serial_number"), rs.getDate("start_date").toLocalDate(), rs.getDate("return_date").toLocalDate(),
+                rs.getLong("calendar_days"), rs.getBigDecimal("daily_amount_snapshot"),
+                rs.getBigDecimal("rental_amount_snapshot"), rs.getBigDecimal("deposit_snapshot"),
+                rs.getBigDecimal("total_amount"), rs.getString("currency"), List.of()), reservationId, customerId);
+        if (invoices.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No existe un comprobante para esta reserva");
+        InvoiceResponse invoice = invoices.getFirst();
+        List<InvoicePaymentResponse> payments = jdbc.query("""
+                SELECT operation_type, amount, currency, status, created_at
+                FROM payment_operation WHERE reservation_id = ? ORDER BY created_at, payment_operation_id
+                """, (rs, row) -> new InvoicePaymentResponse(rs.getString("operation_type"),
+                rs.getBigDecimal("amount"), rs.getString("currency"), rs.getString("status"),
+                rs.getTimestamp("created_at").toLocalDateTime()), reservationId);
+        return new InvoiceResponse(invoice.invoiceId(), invoice.invoiceNumber(), invoice.status(), invoice.issuedAt(),
+                invoice.businessId(), invoice.businessName(), invoice.customerName(), invoice.customerEmail(),
+                invoice.reservationId(), invoice.reservationStatus(), invoice.equipmentId(), invoice.manufacturer(),
+                invoice.modelName(), invoice.serialNumber(), invoice.startDate(), invoice.returnDate(), invoice.calendarDays(),
+                invoice.dailyAmount(), invoice.rentalAmount(), invoice.depositAmount(), invoice.totalAmount(),
+                invoice.currency(), payments);
     }
 
     public List<ProviderRentalResponse> listForProvider(long providerId) {
@@ -181,6 +228,7 @@ public class ReservationService {
                 WHERE reservation_id = ? AND customer_user_id = ?
                 """, cancelledAt, reason == null || reason.isBlank() ? null : reason.trim(),
                 refundPercent, reservationId, customerId);
+        jdbc.update("UPDATE invoice SET status = 'CANCELLED' WHERE reservation_id = ? AND status = 'ISSUED'", reservationId);
         recordPayment(reservationId, "RENT_REFUND", "reservation:" + reservationId + ":cancel:rent-refund",
                 rentRefund, reservation.currency());
         recordPayment(reservationId, "DEPOSIT_REFUND", "reservation:" + reservationId + ":cancel:deposit-refund",
@@ -432,6 +480,17 @@ public class ReservationService {
 
     public record CancellationResponse(long reservationId, String status, int refundPercent,
                                        BigDecimal refundAmount, String currency) { }
+
+    public record InvoiceResponse(long invoiceId, String invoiceNumber, String status, LocalDateTime issuedAt,
+                                  long businessId, String businessName, String customerName, String customerEmail,
+                                  long reservationId, String reservationStatus, long equipmentId,
+                                  String manufacturer, String modelName, String serialNumber,
+                                  LocalDate startDate, LocalDate returnDate, long calendarDays,
+                                  BigDecimal dailyAmount, BigDecimal rentalAmount, BigDecimal depositAmount,
+                                  BigDecimal totalAmount, String currency, List<InvoicePaymentResponse> payments) { }
+
+    public record InvoicePaymentResponse(String operationType, BigDecimal amount, String currency,
+                                         String status, LocalDateTime createdAt) { }
 
     public record RentalLifecycleResponse(long reservationId, String status,
                                           LocalDateTime handedOverAt, LocalDateTime returnedAt,

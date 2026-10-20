@@ -42,6 +42,8 @@ Con el backend y MySQL activos, abre `http://localhost:8080/`. La página consum
 
 En **Mis reservas**, un cliente puede cancelar una reserva confirmada. El servidor calcula y registra el reembolso simulado según la anticipación; la lista conserva el porcentaje e importe devueltos para consultar la cancelación después.
 
+Cada nueva reserva también genera un comprobante académico en `invoice`, dentro de la misma transacción. `GET /api/v1/reservations/{reservationId}/invoice` devuelve el detalle y las operaciones de pago simuladas, y solo el cliente propietario puede consultarlo. Desde Mis reservas se abre `/invoice.html`, donde se puede imprimir o guardar como PDF con el navegador. Al cancelar, el comprobante cambia a `CANCELLED`; no es una factura fiscal ni representa un pago real.
+
 Las cuentas `PROVEEDOR` pueden abrir `/provider.html` después de iniciar sesión en el catálogo. El panel muestra los equipos del negocio que tienen asignado y permite registrar equipos con tarifa y depósito, además de cambiar su estado entre `AVAILABLE`, `MAINTENANCE` y `RETIRED`. Un proveedor sin asignación vigente no puede consultar ni modificar inventario.
 
 El mismo panel permite consultar reservas del negocio y registrar la entrega de una reserva confirmada. Al recibir el equipo, el proveedor registra si está en buen estado o si tiene daño parcial o total. Un daño deja el depósito pendiente y el proveedor que hizo la entrega puede adjuntar evidencia JPG, PNG, MP4 o PDF desde la reserva.

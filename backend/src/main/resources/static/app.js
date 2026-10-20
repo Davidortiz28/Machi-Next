@@ -260,6 +260,9 @@
           });
           item.append(cancelButton);
         }
+        const invoiceLink = element("a", "button button-outline reservation-cancel", "Ver comprobante");
+        invoiceLink.href = `/invoice.html?reservationId=${reservation.reservationId}`;
+        item.append(invoiceLink);
         list.append(item);
       }
     } catch (error) {

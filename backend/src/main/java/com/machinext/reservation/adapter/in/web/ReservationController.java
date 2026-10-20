@@ -42,6 +42,11 @@ public class ReservationController {
         return reservationService.listForCustomer(Long.parseLong(jwt.getSubject()));
     }
 
+    @GetMapping("/{reservationId}/invoice")
+    public ReservationService.InvoiceResponse invoice(@AuthenticationPrincipal Jwt jwt, @PathVariable long reservationId) {
+        return reservationService.findInvoiceForCustomer(Long.parseLong(jwt.getSubject()), reservationId);
+    }
+
     @PostMapping("/{reservationId}/cancel")
     public ReservationService.CancellationResponse cancel(@AuthenticationPrincipal Jwt jwt,
                                                            @PathVariable long reservationId,
