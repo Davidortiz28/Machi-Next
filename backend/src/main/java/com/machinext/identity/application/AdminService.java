@@ -38,7 +38,8 @@ public class AdminService {
                 ORDER BY u.display_name, u.user_id
                 """, (rs, row) -> new ProviderAccountSummary(rs.getLong("user_id"), rs.getString("email"),
                 rs.getString("display_name"), rs.getString("account_status"),
-                (Long) rs.getObject("business_id"), rs.getString("business_name"), rs.getString("business_status")));
+                rs.getObject("business_id") == null ? null : ((Number) rs.getObject("business_id")).longValue(),
+                rs.getString("business_name"), rs.getString("business_status")));
     }
 
     public List<UserAccountSummary> listUsers() {

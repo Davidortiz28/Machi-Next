@@ -1,4 +1,4 @@
-﻿package com.machinext.reservation.application;
+package com.machinext.reservation.application;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -13,6 +13,7 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
 @Transactional
@@ -55,6 +56,18 @@ class ReservationApprovalIntegrationTest {
                 String.class, request.reservationId()));
         assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM payment_operation WHERE reservation_id = ? AND operation_type IN ('RENT_REFUND', 'DEPOSIT_REFUND')",
                 Integer.class, request.reservationId()));
+    }
+
+    @Test
+    void assignedProviderCanSeePendingRequest() {
+        Fixture fixture = fixture();
+        LocalDate start = LocalDate.now().plusDays(20);
+        ReservationService.ReservationResponse request = reservations.create(fixture.customerId(), fixture.equipmentId(),
+                start, start.plusDays(1));
+
+        assertTrue(reservations.listForProvider(fixture.providerId()).stream()
+                .anyMatch(item -> item.reservationId() == request.reservationId()
+                        && "PENDING_PROVIDER".equals(item.status())));
     }
 
     private Fixture fixture() {

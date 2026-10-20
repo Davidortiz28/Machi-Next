@@ -222,7 +222,8 @@ public class ReservationService {
                 rs.getBigDecimal("rental_amount_snapshot"), rs.getBigDecimal("deposit_snapshot"),
                 rs.getString("currency"), rs.getString("customer_name"), rs.getString("manufacturer"),
                 rs.getString("model_name"), rs.getString("return_condition"),
-                (Long) rs.getObject("handed_over_by_user_id")), businessId);
+                rs.getObject("handed_over_by_user_id") == null ? null
+                        : ((Number) rs.getObject("handed_over_by_user_id")).longValue()), businessId);
     }
 
     @Transactional
