@@ -55,7 +55,8 @@ public class BusinessReportService {
                 business.availableToday(), business.maintenanceEquipment(), business.retiredEquipment(), business.reservationCount(),
                 business.pendingProviderReservations(), business.confirmedReservations(), business.activeRentals(), business.completedRentals(),
                 listRentIncome(business.businessId()), listPendingDeposits(business.businessId()),
-                listMostRentedEquipment(business.businessId()), listFrequentCustomers(business.businessId()))).toList();
+                listMostRentedEquipment(business.businessId()), listFrequentCustomers(business.businessId()),
+                listRentalHistory(business.businessId()))).toList();
     }
 
     private List<RentIncomeByCurrency> listRentIncome(long businessId) {
@@ -120,6 +121,29 @@ public class BusinessReportService {
                 rs.getLong("rental_count")), businessId);
     }
 
+    private List<RentalHistoryEntry> listRentalHistory(long businessId) {
+        return jdbc.query("""
+                SELECT r.reservation_id, r.status, cu.display_name AS customer_name,
+                       eu.equipment_id, em.manufacturer, em.model_name,
+                       ri.start_date, ri.return_date, ri.rental_amount_snapshot, ri.deposit_snapshot,
+                       dr.currency, re.return_condition
+                FROM reservation r
+                JOIN app_user cu ON cu.user_id = r.customer_user_id
+                JOIN reservation_item ri ON ri.reservation_id = r.reservation_id
+                JOIN equipment_unit eu ON eu.equipment_id = ri.equipment_id
+                JOIN equipment_model em ON em.model_id = eu.model_id
+                JOIN daily_rate dr ON dr.equipment_id = ri.equipment_id AND dr.rate_id = ri.rate_id
+                LEFT JOIN rental re ON re.reservation_item_id = ri.reservation_item_id
+                WHERE r.business_id = ?
+                ORDER BY r.created_at DESC, r.reservation_id DESC
+                LIMIT 100
+                """, (rs, row) -> new RentalHistoryEntry(rs.getLong("reservation_id"), rs.getString("status"),
+                rs.getString("customer_name"), rs.getLong("equipment_id"), rs.getString("manufacturer"),
+                rs.getString("model_name"), rs.getDate("start_date").toLocalDate(),
+                rs.getDate("return_date").toLocalDate(), rs.getBigDecimal("rental_amount_snapshot"),
+                rs.getBigDecimal("deposit_snapshot"), rs.getString("currency"), rs.getString("return_condition")), businessId);
+    }
+
     private record BusinessMetrics(long businessId, String businessName, String businessStatus,
                                    long equipmentCount, long availableEquipment, long availableToday, long maintenanceEquipment,
                                    long retiredEquipment, long reservationCount, long pendingProviderReservations,
@@ -132,7 +156,8 @@ public class BusinessReportService {
                                  List<RentIncomeByCurrency> rentIncomeByCurrency,
                                  List<DepositBalanceByCurrency> pendingDepositsByCurrency,
                                  List<EquipmentRentalCount> mostRentedEquipment,
-                                 List<FrequentCustomer> frequentCustomers) { }
+                                 List<FrequentCustomer> frequentCustomers,
+                                 List<RentalHistoryEntry> rentalHistory) { }
 
     public record RentIncomeByCurrency(String currency, BigDecimal rentCharged,
                                        BigDecimal rentRefunded, BigDecimal netRentIncome) { }
@@ -143,4 +168,9 @@ public class BusinessReportService {
                                        long rentalCount) { }
 
     public record FrequentCustomer(String displayName, long rentalCount) { }
+
+    public record RentalHistoryEntry(long reservationId, String status, String customerName, long equipmentId,
+                                     String manufacturer, String modelName, java.time.LocalDate startDate,
+                                     java.time.LocalDate returnDate, BigDecimal rentalAmount, BigDecimal depositAmount,
+                                     String currency, String returnCondition) { }
 }

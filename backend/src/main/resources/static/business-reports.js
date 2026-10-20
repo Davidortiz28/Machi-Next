@@ -43,6 +43,22 @@
       if (report.pendingDepositsByCurrency.length) deposits.append(table(["Moneda", "Monto pendiente"], report.pendingDepositsByCurrency.map((row) => [row.currency, money(row.pendingDeposits, row.currency)])));
       else deposits.append(node("p", "No hay depósitos pendientes de liquidación."));
       card.append(deposits);
+      const history = node("section", null, "money-section");
+      history.append(node("h3", "Historial de reservas y alquileres"));
+      history.append(node("p", "Mostrando hasta los 100 registros más recientes."));
+      if (report.rentalHistory.length) {
+        const historyTable = table(
+          ["Reserva", "Cliente", "Equipo", "Fechas", "Estado", "Condición", "Renta", "Depósito"],
+          report.rentalHistory.map((row) => {
+            const statusLabel = ({ PENDING_PROVIDER: "Pendiente", CONFIRMED: "Confirmada", IN_RENTAL: "En alquiler", COMPLETED: "Finalizada", REJECTED: "Rechazada", CANCELLED: "Cancelada" })[row.status] || row.status;
+            const conditionLabel = ({ GOOD: "Sin daños", PARTIAL_DAMAGE: "Daño parcial", TOTAL_DAMAGE: "Daño total" })[row.returnCondition] || "—";
+            return [`#${row.reservationId}`, row.customerName, `${row.manufacturer} ${row.modelName} (#${row.equipmentId})`, `${row.startDate} → ${row.returnDate}`, statusLabel, conditionLabel, money(row.rentalAmount, row.currency), money(row.depositAmount, row.currency)];
+          })
+        );
+        const historyScroll = node("div", null, "history-scroll");
+        historyScroll.append(historyTable); history.append(historyScroll);
+      } else history.append(node("p", "Todavía no hay reservas registradas."));
+      card.append(history);
       const rankings = node("div", null, "ranking-grid");
       const equipment = node("section", null, "money-section"); equipment.append(node("h3", "Equipos más alquilados"));
       if (report.mostRentedEquipment.length) equipment.append(table(["Equipo", "Alquileres"], report.mostRentedEquipment.map((row) => [`${row.manufacturer} ${row.modelName} (#${row.equipmentId})`, String(row.rentalCount)])));
