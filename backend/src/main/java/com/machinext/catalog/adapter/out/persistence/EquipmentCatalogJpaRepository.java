@@ -29,9 +29,12 @@ public interface EquipmentCatalogJpaRepository extends Repository<EquipmentUnitJ
               AND b.status = 'ACTIVE'
               AND dr.valid_from <= CURRENT_DATE
               AND (dr.valid_to IS NULL OR dr.valid_to >= CURRENT_DATE)
+              AND (COALESCE(:search, '') = '' OR LOWER(CONCAT(em.manufacturer, ' ', em.model_name, ' ', COALESCE(em.description, ''))) LIKE CONCAT('%', LOWER(:search), '%'))
+              AND (COALESCE(:category, '') = '' OR LOWER(c.name) = LOWER(:category))
             ORDER BY c.name, em.model_name, eu.equipment_id
             """, nativeQuery = true)
-    List<EquipmentCatalogProjection> findCurrentCatalog();
+    List<EquipmentCatalogProjection> findCurrentCatalog(@Param("search") String search,
+                                                         @Param("category") String category);
 
     @Query(value = """
             SELECT eu.equipment_id AS equipmentId,
@@ -52,12 +55,14 @@ public interface EquipmentCatalogJpaRepository extends Repository<EquipmentUnitJ
               AND b.status = 'ACTIVE'
               AND dr.valid_from <= :startDate
               AND (dr.valid_to IS NULL OR dr.valid_to >= :returnDate)
+              AND (COALESCE(:search, '') = '' OR LOWER(CONCAT(em.manufacturer, ' ', em.model_name, ' ', COALESCE(em.description, ''))) LIKE CONCAT('%', LOWER(:search), '%'))
+              AND (COALESCE(:category, '') = '' OR LOWER(c.name) = LOWER(:category))
               AND NOT EXISTS (
                   SELECT 1
                   FROM reservation_item ri
                   JOIN reservation r ON r.reservation_id = ri.reservation_id
                   WHERE ri.equipment_id = eu.equipment_id
-                    AND r.status IN ('CONFIRMED', 'IN_RENTAL')
+                    AND r.status IN ('PENDING_PROVIDER', 'CONFIRMED', 'IN_RENTAL')
                     AND ri.start_date <= :returnDate
                     AND ri.return_date >= :startDate
               )
@@ -74,5 +79,7 @@ public interface EquipmentCatalogJpaRepository extends Repository<EquipmentUnitJ
             """, nativeQuery = true)
     List<EquipmentCatalogProjection> findAvailable(
             @Param("startDate") LocalDate startDate,
-            @Param("returnDate") LocalDate returnDate);
+            @Param("returnDate") LocalDate returnDate,
+            @Param("search") String search,
+            @Param("category") String category);
 }

@@ -17,6 +17,7 @@ services:
       - ./database/004_provider_transfer_wait.sql:/docker-entrypoint-initdb.d/004_provider_transfer_wait.sql:ro
       - ./database/005_business_administrators.sql:/docker-entrypoint-initdb.d/005_business_administrators.sql:ro
       - ./database/006_provider_transfer_automation.sql:/docker-entrypoint-initdb.d/006_provider_transfer_automation.sql:ro
+      - ./database/007_reservation_approval.sql:/docker-entrypoint-initdb.d/007_reservation_approval.sql:ro
     healthcheck:
       test:
         - CMD-SHELL

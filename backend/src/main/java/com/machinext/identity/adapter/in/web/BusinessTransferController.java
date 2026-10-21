@@ -1,6 +1,7 @@
 package com.machinext.identity.adapter.in.web;
 
 import com.machinext.identity.application.ProviderTransferService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -17,6 +18,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/business/provider-transfers")
+@SecurityRequirement(name = "bearerAuth")
 public class BusinessTransferController {
     private final ProviderTransferService transferService;
 

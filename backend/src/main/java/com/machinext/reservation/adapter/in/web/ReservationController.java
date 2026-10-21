@@ -2,6 +2,7 @@ package com.machinext.reservation.adapter.in.web;
 
 import com.machinext.reservation.application.ReservationService;
 import com.machinext.catalog.domain.InvalidRentalPeriodException;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -23,6 +24,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/reservations")
+@SecurityRequirement(name = "bearerAuth")
 public class ReservationController {
     private final ReservationService reservationService;
 

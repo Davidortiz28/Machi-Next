@@ -2,6 +2,7 @@ package com.machinext.reservation.adapter.in.web;
 
 import com.machinext.reservation.application.ReservationService;
 import com.machinext.reservation.adapter.out.storage.DamageEvidenceStorage;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -23,6 +24,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/rentals")
+@SecurityRequirement(name = "bearerAuth")
 public class RentalController {
     private final ReservationService reservationService;
     private final DamageEvidenceStorage evidenceStorage;

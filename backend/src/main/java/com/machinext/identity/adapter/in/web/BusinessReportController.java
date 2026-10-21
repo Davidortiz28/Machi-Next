@@ -1,6 +1,7 @@
 package com.machinext.identity.adapter.in.web;
 
 import com.machinext.identity.application.BusinessReportService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -11,6 +12,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/business/reports")
+@SecurityRequirement(name = "bearerAuth")
 public class BusinessReportController {
     private final BusinessReportService reports;
 

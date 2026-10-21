@@ -135,7 +135,7 @@ CREATE TABLE IF NOT EXISTS reservation (
   reservation_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   customer_user_id BIGINT UNSIGNED NOT NULL,
   business_id BIGINT UNSIGNED NOT NULL,
-  status VARCHAR(16) NOT NULL DEFAULT 'CONFIRMED',
+  status VARCHAR(16) NOT NULL DEFAULT 'PENDING_PROVIDER',
   created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   cancelled_at DATETIME(6) NULL,
   cancellation_reason VARCHAR(500) NULL,
@@ -143,7 +143,7 @@ CREATE TABLE IF NOT EXISTS reservation (
   PRIMARY KEY (reservation_id),
   CONSTRAINT fk_reservation_customer FOREIGN KEY (customer_user_id) REFERENCES app_user (user_id),
   CONSTRAINT fk_reservation_business FOREIGN KEY (business_id) REFERENCES business (business_id),
-  CONSTRAINT ck_reservation_status CHECK (status IN ('CONFIRMED', 'IN_RENTAL', 'CANCELLED', 'COMPLETED')),
+  CONSTRAINT ck_reservation_status CHECK (status IN ('PENDING_PROVIDER', 'CONFIRMED', 'REJECTED', 'IN_RENTAL', 'CANCELLED', 'COMPLETED')),
   CONSTRAINT ck_reservation_refund CHECK (refund_percent IS NULL OR refund_percent IN (90, 100)),
   INDEX ix_reservation_customer_created (customer_user_id, created_at),
   INDEX ix_reservation_business_status (business_id, status)
@@ -261,12 +261,12 @@ CREATE TABLE IF NOT EXISTS invoice (
   total_amount DECIMAL(12,2) NOT NULL,
   currency CHAR(3) NOT NULL DEFAULT 'COP',
   issued_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-  status VARCHAR(16) NOT NULL DEFAULT 'ISSUED',
+  status VARCHAR(16) NOT NULL DEFAULT 'PENDING',
   PRIMARY KEY (invoice_id),
   CONSTRAINT fk_invoice_business FOREIGN KEY (business_id) REFERENCES business (business_id),
   CONSTRAINT fk_invoice_reservation FOREIGN KEY (reservation_id) REFERENCES reservation (reservation_id),
   CONSTRAINT uk_invoice_reservation UNIQUE (reservation_id),
   CONSTRAINT uk_invoice_business_number UNIQUE (business_id, invoice_number),
   CONSTRAINT ck_invoice_amount CHECK (total_amount >= 0),
-  CONSTRAINT ck_invoice_status CHECK (status IN ('ISSUED', 'CANCELLED'))
+  CONSTRAINT ck_invoice_status CHECK (status IN ('PENDING', 'ISSUED', 'CANCELLED'))
 ) ENGINE = InnoDB;

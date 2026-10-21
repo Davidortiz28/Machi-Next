@@ -8,6 +8,8 @@
   const dateForm = document.querySelector("#availability-form");
   const startInput = document.querySelector("#start-date");
   const returnInput = document.querySelector("#return-date");
+  const searchInput = document.querySelector("#equipment-search");
+  const categoryInput = document.querySelector("#equipment-category");
   const authMessage = document.querySelector("#auth-message");
   const bookingMessage = document.querySelector("#booking-message");
   const toast = document.querySelector("#toast");
@@ -117,6 +119,8 @@
     document.querySelector("#empty-state").hidden = true;
     setText("#catalog-status", "Buscando equipos disponibles…");
     const params = new URLSearchParams({ startDate: startInput.value, returnDate: returnInput.value });
+    if (searchInput.value.trim()) params.set("search", searchInput.value.trim());
+    if (categoryInput.value.trim()) params.set("category", categoryInput.value.trim());
     try {
       const results = await api(`/api/v1/catalog/equipment/availability?${params}`);
       renderEquipment(results.equipment || []);
@@ -225,7 +229,7 @@
     if (!sessionStorage.getItem(tokenKey) || !user?.roles?.includes("CLIENTE")) return;
     const list = document.querySelector("#reservation-list");
     try {
-      const reservations = await api("/api/v1/reservations");
+      const reservations = await api("/api/v1/reservations/history");
       list.replaceChildren();
       if (!reservations.length) {
         list.append(element("p", "empty-reservations", "Aún no tienes reservas. Explora el catálogo para empezar."));
@@ -234,16 +238,19 @@
       for (const reservation of reservations) {
         const item = element("article", "reservation-item");
         const details = element("div");
-        details.append(element("h3", "", `Reserva #${reservation.reservationId} · Equipo #${reservation.equipmentId}`));
-        details.append(element("p", "", `${reservation.startDate} → ${reservation.returnDate} · ${reservation.calendarDays} días · ${reservation.status}`));
+        details.append(element("h3", "", `Reserva #${reservation.reservationId} · ${reservation.manufacturer} ${reservation.modelName}`));
+        details.append(element("p", "", `${reservation.businessName} · Equipo #${reservation.equipmentId}`));
+        details.append(element("p", "", `${reservation.startDate} → ${reservation.returnDate} · ${reservation.status}`));
+        if (reservation.handedOverAt) details.append(element("p", "", `Entregado: ${reservation.handedOverAt} · ${reservation.handedOverBy || "Proveedor"}`));
+        if (reservation.returnedAt) details.append(element("p", "", `Devuelto: ${reservation.returnedAt} · ${reservation.returnCondition || "Condición sin datos"}`));
         const amount = element("div", "reservation-amount");
         amount.append(document.createTextNode(money(reservation.rentalAmount, reservation.currency)));
         amount.append(element("small", "", `Depósito: ${money(reservation.depositAmount, reservation.currency)}`));
-        if (reservation.status === "CANCELLED" && reservation.refundAmount !== null) {
+        if (["CANCELLED", "REJECTED"].includes(reservation.status) && reservation.refundAmount !== null) {
           amount.append(element("small", "", `Reembolso simulado (${reservation.refundPercent}%): ${money(reservation.refundAmount, reservation.currency)}`));
         }
         item.append(details, amount);
-        if (reservation.status === "CONFIRMED") {
+        if (["PENDING_PROVIDER", "CONFIRMED"].includes(reservation.status)) {
           const cancelButton = element("button", "button button-outline reservation-cancel", "Cancelar reserva");
           cancelButton.type = "button";
           cancelButton.addEventListener("click", async () => {
@@ -253,7 +260,7 @@
               const cancellation = await api(`/api/v1/reservations/${reservation.reservationId}/cancel`, {
                 method: "POST", body: JSON.stringify({ reason: "Cancelada por el cliente" })
               });
-              showToast(`Reserva cancelada. Reembolso simulado: ${money(cancellation.refundAmount, cancellation.currency)} (${cancellation.refundPercent}%).`);
+              showToast(`Solicitud cancelada. Reembolso simulado: ${money(cancellation.refundAmount, cancellation.currency)} (${cancellation.refundPercent}%).`);
               await loadReservations();
               await loadAvailability();
             } catch (error) { showToast(error.message, true); cancelButton.disabled = false; }
@@ -347,7 +354,7 @@
         })
       });
       bookingDialog.close();
-      showToast(`Reserva #${reservation.reservationId} confirmada.`);
+      showToast(`Solicitud #${reservation.reservationId} enviada al proveedor.`);
       document.querySelector("#my-reservations").hidden = false;
       await loadAvailability();
       await loadReservations();

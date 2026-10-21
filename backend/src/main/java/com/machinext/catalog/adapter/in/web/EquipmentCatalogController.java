@@ -35,8 +35,10 @@ public class EquipmentCatalogController {
     }
 
     @GetMapping
-    public List<EquipmentCatalogResponse> listEquipment() {
-        return listEquipmentCatalog.execute().stream()
+    public List<EquipmentCatalogResponse> listEquipment(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String category) {
+        return listEquipmentCatalog.execute(search, category).stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -44,9 +46,11 @@ public class EquipmentCatalogController {
     @GetMapping("/availability")
     public AvailabilityResponse findAvailable(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate returnDate) {
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate returnDate,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String category) {
         RentalPeriod period = new RentalPeriod(startDate, returnDate);
-        List<AvailableEquipmentResponse> equipment = findAvailableEquipment.execute(period).stream()
+        List<AvailableEquipmentResponse> equipment = findAvailableEquipment.execute(period, search, category).stream()
                 .map(this::toAvailableResponse)
                 .toList();
         return new AvailabilityResponse(startDate, returnDate, period.calendarDaysInclusive(), equipment);

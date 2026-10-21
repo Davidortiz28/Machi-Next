@@ -29,9 +29,14 @@ public class BusinessReportService {
                 SELECT b.business_id, b.legal_name, b.status,
                        (SELECT COUNT(*) FROM equipment_unit eu WHERE eu.business_id = b.business_id) AS equipment_count,
                        (SELECT COUNT(*) FROM equipment_unit eu WHERE eu.business_id = b.business_id AND eu.operational_status = 'AVAILABLE') AS available_equipment,
+                       (SELECT COUNT(*) FROM equipment_unit eu WHERE eu.business_id = b.business_id AND eu.operational_status = 'AVAILABLE'
+                         AND NOT EXISTS (SELECT 1 FROM reservation_item ri JOIN reservation r ON r.reservation_id = ri.reservation_id
+                           WHERE ri.equipment_id = eu.equipment_id AND r.status IN ('PENDING_PROVIDER', 'CONFIRMED', 'IN_RENTAL')
+                             AND ri.start_date <= CURRENT_DATE AND ri.return_date >= CURRENT_DATE)) AS available_today,
                        (SELECT COUNT(*) FROM equipment_unit eu WHERE eu.business_id = b.business_id AND eu.operational_status = 'MAINTENANCE') AS maintenance_equipment,
                        (SELECT COUNT(*) FROM equipment_unit eu WHERE eu.business_id = b.business_id AND eu.operational_status = 'RETIRED') AS retired_equipment,
                        (SELECT COUNT(*) FROM reservation r WHERE r.business_id = b.business_id) AS reservation_count,
+                       (SELECT COUNT(*) FROM reservation r WHERE r.business_id = b.business_id AND r.status = 'PENDING_PROVIDER') AS pending_provider_reservations,
                        (SELECT COUNT(*) FROM reservation r WHERE r.business_id = b.business_id AND r.status = 'CONFIRMED') AS confirmed_reservations,
                        (SELECT COUNT(*) FROM reservation r WHERE r.business_id = b.business_id AND r.status = 'IN_RENTAL') AS active_rentals,
                        (SELECT COUNT(*) FROM reservation r WHERE r.business_id = b.business_id AND r.status = 'COMPLETED') AS completed_rentals
@@ -41,13 +46,14 @@ public class BusinessReportService {
                 ORDER BY b.legal_name
                 """, (rs, row) -> new BusinessMetrics(rs.getLong("business_id"), rs.getString("legal_name"), rs.getString("status"),
                     rs.getLong("equipment_count"), rs.getLong("available_equipment"),
+                    rs.getLong("available_today"),
                     rs.getLong("maintenance_equipment"), rs.getLong("retired_equipment"),
-                    rs.getLong("reservation_count"), rs.getLong("confirmed_reservations"),
+                    rs.getLong("reservation_count"), rs.getLong("pending_provider_reservations"), rs.getLong("confirmed_reservations"),
                     rs.getLong("active_rentals"), rs.getLong("completed_rentals")), userId);
         return businesses.stream().map(business -> new BusinessReport(business.businessId(), business.businessName(),
                 business.businessStatus(), business.equipmentCount(), business.availableEquipment(),
-                business.maintenanceEquipment(), business.retiredEquipment(), business.reservationCount(),
-                business.confirmedReservations(), business.activeRentals(), business.completedRentals(),
+                business.availableToday(), business.maintenanceEquipment(), business.retiredEquipment(), business.reservationCount(),
+                business.pendingProviderReservations(), business.confirmedReservations(), business.activeRentals(), business.completedRentals(),
                 listRentIncome(business.businessId()), listPendingDeposits(business.businessId()),
                 listMostRentedEquipment(business.businessId()), listFrequentCustomers(business.businessId()))).toList();
     }
@@ -115,14 +121,14 @@ public class BusinessReportService {
     }
 
     private record BusinessMetrics(long businessId, String businessName, String businessStatus,
-                                   long equipmentCount, long availableEquipment, long maintenanceEquipment,
-                                   long retiredEquipment, long reservationCount, long confirmedReservations,
-                                   long activeRentals, long completedRentals) { }
+                                   long equipmentCount, long availableEquipment, long availableToday, long maintenanceEquipment,
+                                   long retiredEquipment, long reservationCount, long pendingProviderReservations,
+                                   long confirmedReservations, long activeRentals, long completedRentals) { }
 
     public record BusinessReport(long businessId, String businessName, String businessStatus,
-                                 long equipmentCount, long availableEquipment, long maintenanceEquipment,
+                                 long equipmentCount, long availableEquipment, long availableToday, long maintenanceEquipment,
                                  long retiredEquipment, long reservationCount, long confirmedReservations,
-                                 long activeRentals, long completedRentals,
+                                 long activeRentals, long completedRentals, long pendingProviderReservations,
                                  List<RentIncomeByCurrency> rentIncomeByCurrency,
                                  List<DepositBalanceByCurrency> pendingDepositsByCurrency,
                                  List<EquipmentRentalCount> mostRentedEquipment,

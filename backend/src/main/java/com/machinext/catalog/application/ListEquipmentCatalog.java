@@ -13,7 +13,7 @@ public class ListEquipmentCatalog {
         this.equipmentCatalog = equipmentCatalog;
     }
 
-    public List<CatalogItem> execute() {
-        return equipmentCatalog.findCurrentCatalog();
+    public List<CatalogItem> execute(String search, String category) {
+        return equipmentCatalog.findCurrentCatalog(search, category);
     }
 }

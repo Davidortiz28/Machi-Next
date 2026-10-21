@@ -3,6 +3,7 @@ package com.machinext.reservation.application;
 import com.machinext.catalog.domain.RentalPeriod;
 import com.machinext.reservation.domain.CancellationPolicy;
 import com.machinext.reservation.domain.DepositSettlement;
+import com.machinext.reservation.domain.ReservationApproval;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -59,7 +60,7 @@ public class ReservationService {
                 FROM reservation_item ri
                 JOIN reservation r ON r.reservation_id = ri.reservation_id
                 WHERE ri.equipment_id = ?
-                  AND r.status IN ('CONFIRMED', 'IN_RENTAL')
+                  AND r.status IN ('PENDING_PROVIDER', 'CONFIRMED', 'IN_RENTAL')
                   AND ri.start_date <= ?
                   AND ri.return_date >= ?
                 """, Integer.class, equipmentId, returnDate, startDate);
@@ -69,7 +70,7 @@ public class ReservationService {
 
         Rate rate = rates.getFirst();
         BigDecimal rentalAmount = rate.dailyAmount().multiply(BigDecimal.valueOf(period.calendarDaysInclusive()));
-        jdbc.update("INSERT INTO reservation (customer_user_id, business_id, status) VALUES (?, ?, 'CONFIRMED')",
+        jdbc.update("INSERT INTO reservation (customer_user_id, business_id, status) VALUES (?, ?, 'PENDING_PROVIDER')",
                 customerId, rate.businessId());
         Long reservationId = jdbc.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
         jdbc.update("""
@@ -86,9 +87,9 @@ public class ReservationService {
         String invoiceNumber = "MN-" + rate.businessId() + "-" + reservationId;
         jdbc.update("""
                 INSERT INTO invoice (business_id, reservation_id, invoice_number, total_amount, currency, status)
-                VALUES (?, ?, ?, ?, ?, 'ISSUED')
+                VALUES (?, ?, ?, ?, ?, 'PENDING')
                 """, rate.businessId(), reservationId, invoiceNumber, rentalAmount.add(rate.depositAmount()), rate.currency());
-        return new ReservationResponse(reservationId, equipmentId, "CONFIRMED", startDate, returnDate,
+        return new ReservationResponse(reservationId, equipmentId, "PENDING_PROVIDER", startDate, returnDate,
                 period.calendarDaysInclusive(), rate.dailyAmount(), rentalAmount, rate.depositAmount(), rate.currency(), null, null);
     }
 
@@ -112,6 +113,36 @@ public class ReservationService {
                 rs.getBigDecimal("daily_amount_snapshot"), rs.getBigDecimal("rental_amount_snapshot"),
                 rs.getBigDecimal("deposit_snapshot"), rs.getString("currency"),
                 (Integer) rs.getObject("refund_percent"), rs.getBigDecimal("refund_amount")), customerId);
+    }
+
+    public List<CustomerRentalHistory> rentalHistoryForCustomer(long customerId) {
+        return jdbc.query("""
+                SELECT r.reservation_id, r.status, b.legal_name AS business_name, ri.equipment_id,
+                       em.manufacturer, em.model_name, ri.start_date, ri.return_date,
+                       ri.rental_amount_snapshot, ri.deposit_snapshot, dr.currency, r.refund_percent,
+                       re.handed_over_at, re.returned_at, re.return_condition,
+                       hu.display_name AS handed_over_by, ru.display_name AS returned_to,
+                       (SELECT COALESCE(SUM(po.amount), 0) FROM payment_operation po
+                        WHERE po.reservation_id = r.reservation_id AND po.operation_type IN ('RENT_REFUND', 'DEPOSIT_REFUND')) AS refund_amount
+                FROM reservation r
+                JOIN business b ON b.business_id = r.business_id
+                JOIN reservation_item ri ON ri.reservation_id = r.reservation_id
+                JOIN equipment_unit eu ON eu.equipment_id = ri.equipment_id
+                JOIN equipment_model em ON em.model_id = eu.model_id
+                JOIN daily_rate dr ON dr.equipment_id = ri.equipment_id AND dr.rate_id = ri.rate_id
+                LEFT JOIN rental re ON re.reservation_item_id = ri.reservation_item_id
+                LEFT JOIN app_user hu ON hu.user_id = re.handed_over_by_user_id
+                LEFT JOIN app_user ru ON ru.user_id = re.returned_to_user_id
+                WHERE r.customer_user_id = ?
+                ORDER BY r.created_at DESC, r.reservation_id DESC
+                """, (rs, row) -> new CustomerRentalHistory(rs.getLong("reservation_id"), rs.getString("status"),
+                rs.getString("business_name"), rs.getLong("equipment_id"), rs.getString("manufacturer"),
+                rs.getString("model_name"), rs.getDate("start_date").toLocalDate(), rs.getDate("return_date").toLocalDate(),
+                rs.getBigDecimal("rental_amount_snapshot"), rs.getBigDecimal("deposit_snapshot"), rs.getString("currency"),
+                (Integer) rs.getObject("refund_percent"), rs.getBigDecimal("refund_amount"),
+                rs.getTimestamp("handed_over_at") == null ? null : rs.getTimestamp("handed_over_at").toLocalDateTime(),
+                rs.getTimestamp("returned_at") == null ? null : rs.getTimestamp("returned_at").toLocalDateTime(),
+                rs.getString("return_condition"), rs.getString("handed_over_by"), rs.getString("returned_to")), customerId);
     }
 
     public InvoiceResponse findInvoiceForCustomer(long customerId, long reservationId) {
@@ -195,6 +226,60 @@ public class ReservationService {
     }
 
     @Transactional
+    public ReservationDecisionResponse decide(long providerId, long reservationId, String decision) {
+        List<DecisionData> rows = jdbc.query("""
+                SELECT r.status, r.business_id, ri.rental_amount_snapshot, ri.deposit_snapshot, dr.currency
+                FROM reservation r
+                JOIN reservation_item ri ON ri.reservation_id = r.reservation_id
+                JOIN daily_rate dr ON dr.equipment_id = ri.equipment_id AND dr.rate_id = ri.rate_id
+                WHERE r.reservation_id = ?
+                FOR UPDATE
+                """, (rs, row) -> new DecisionData(rs.getString("status"), rs.getLong("business_id"),
+                rs.getBigDecimal("rental_amount_snapshot"), rs.getBigDecimal("deposit_snapshot"),
+                rs.getString("currency")), reservationId);
+        if (rows.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No existe esa reserva");
+        DecisionData reservation = rows.getFirst();
+        if (providerAssignmentDoesNotMatch(providerId, reservation.businessId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "El proveedor no estÃ¡ asignado a este negocio");
+        }
+        if (!"PENDING_PROVIDER".equals(reservation.status())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "La solicitud ya fue atendida");
+        }
+        ReservationApproval outcome;
+        try {
+            outcome = ReservationApproval.decide(reservation.status(), decision,
+                    reservation.rentalAmount(), reservation.depositAmount());
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
+        } catch (IllegalStateException exception) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, exception.getMessage());
+        }
+        if ("CONFIRMED".equals(outcome.resultingStatus())) {
+            jdbc.update("UPDATE invoice SET status = 'ISSUED', issued_at = CURRENT_TIMESTAMP(6) WHERE reservation_id = ? AND status = 'PENDING'",
+                    reservationId);
+            jdbc.update("""
+                    UPDATE reservation SET status = 'CONFIRMED', provider_decided_by_user_id = ?,
+                           provider_decided_at = CURRENT_TIMESTAMP(6)
+                    WHERE reservation_id = ?
+                    """, providerId, reservationId);
+            return new ReservationDecisionResponse(reservationId, outcome.resultingStatus(), outcome.refundAmount(),
+                    reservation.currency());
+        }
+        jdbc.update("""
+                UPDATE reservation SET status = 'REJECTED', cancelled_at = CURRENT_TIMESTAMP(6),
+                       cancellation_reason = 'Rechazada por el proveedor', refund_percent = 100,
+                       provider_decided_by_user_id = ?, provider_decided_at = CURRENT_TIMESTAMP(6)
+                WHERE reservation_id = ?
+                """, providerId, reservationId);
+        jdbc.update("UPDATE invoice SET status = 'CANCELLED' WHERE reservation_id = ? AND status IN ('PENDING', 'ISSUED')", reservationId);
+        recordPayment(reservationId, "RENT_REFUND", "reservation:" + reservationId + ":provider-reject:rent-refund",
+                reservation.rentalAmount(), reservation.currency());
+        recordPayment(reservationId, "DEPOSIT_REFUND", "reservation:" + reservationId + ":provider-reject:deposit-refund",
+                reservation.depositAmount(), reservation.currency());
+        return new ReservationDecisionResponse(reservationId, outcome.resultingStatus(), outcome.refundAmount(), reservation.currency());
+    }
+
+    @Transactional
     public CancellationResponse cancel(long customerId, long reservationId, String reason) {
         List<CancellationData> rows = jdbc.query("""
                 SELECT r.status, ri.scheduled_start_at, ri.rental_amount_snapshot, ri.deposit_snapshot, dr.currency
@@ -211,8 +296,8 @@ public class ReservationService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No existe esa reserva para este cliente");
         }
         CancellationData reservation = rows.getFirst();
-        if (!"CONFIRMED".equals(reservation.status())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Solo se pueden cancelar reservas confirmadas");
+        if (!List.of("PENDING_PROVIDER", "CONFIRMED").contains(reservation.status())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Solo se pueden cancelar solicitudes pendientes o confirmadas");
         }
 
         LocalDateTime cancelledAt = LocalDateTime.now();
@@ -228,7 +313,7 @@ public class ReservationService {
                 WHERE reservation_id = ? AND customer_user_id = ?
                 """, cancelledAt, reason == null || reason.isBlank() ? null : reason.trim(),
                 refundPercent, reservationId, customerId);
-        jdbc.update("UPDATE invoice SET status = 'CANCELLED' WHERE reservation_id = ? AND status = 'ISSUED'", reservationId);
+        jdbc.update("UPDATE invoice SET status = 'CANCELLED' WHERE reservation_id = ? AND status IN ('PENDING', 'ISSUED')", reservationId);
         recordPayment(reservationId, "RENT_REFUND", "reservation:" + reservationId + ":cancel:rent-refund",
                 rentRefund, reservation.currency());
         recordPayment(reservationId, "DEPOSIT_REFUND", "reservation:" + reservationId + ":cancel:deposit-refund",
@@ -453,8 +538,12 @@ public class ReservationService {
 
     private boolean providerAssignmentDoesNotMatch(long providerId, long businessId) {
         Integer count = jdbc.queryForObject("""
-                SELECT COUNT(*) FROM provider_assignment
-                WHERE provider_user_id = ? AND business_id = ? AND ended_at IS NULL
+                SELECT COUNT(*) FROM provider_assignment pa
+                JOIN app_user u ON u.user_id = pa.provider_user_id AND u.account_status = 'ACTIVE'
+                JOIN user_role ur ON ur.user_id = u.user_id
+                JOIN role ro ON ro.role_id = ur.role_id AND ro.role_code = 'PROVEEDOR'
+                JOIN business b ON b.business_id = pa.business_id AND b.status = 'ACTIVE'
+                WHERE pa.provider_user_id = ? AND pa.business_id = ? AND pa.ended_at IS NULL
                 """, Integer.class, providerId, businessId);
         return count == null || count == 0;
     }
@@ -462,6 +551,8 @@ public class ReservationService {
     private record Rate(long businessId, long rateId, BigDecimal dailyAmount, BigDecimal depositAmount, String currency) { }
     private record CancellationData(String status, LocalDateTime scheduledStartAt,
                                     BigDecimal rentalAmount, BigDecimal depositAmount, String currency) { }
+    private record DecisionData(String status, long businessId, BigDecimal rentalAmount,
+                                BigDecimal depositAmount, String currency) { }
     private record RentalData(String status, long businessId, long itemId, Long rentalId,
                               Long handedOverByUserId, BigDecimal depositAmount, String currency) { }
     private record DamageReportData(long reportId, long reporterId, long businessId) { }
@@ -472,6 +563,13 @@ public class ReservationService {
                                       BigDecimal dailyAmount, BigDecimal rentalAmount, BigDecimal depositAmount,
                                       String currency, Integer refundPercent, BigDecimal refundAmount) { }
 
+    public record CustomerRentalHistory(long reservationId, String status, String businessName, long equipmentId,
+                                        String manufacturer, String modelName, LocalDate startDate, LocalDate returnDate,
+                                        BigDecimal rentalAmount, BigDecimal depositAmount, String currency,
+                                        Integer refundPercent, BigDecimal refundAmount, LocalDateTime handedOverAt,
+                                        LocalDateTime returnedAt, String returnCondition, String handedOverBy,
+                                        String returnedTo) { }
+
     public record ProviderRentalResponse(long reservationId, long equipmentId, String status,
                                          LocalDate startDate, LocalDate returnDate, long calendarDays,
                                          BigDecimal rentalAmount, BigDecimal depositAmount, String currency,
@@ -480,6 +578,9 @@ public class ReservationService {
 
     public record CancellationResponse(long reservationId, String status, int refundPercent,
                                        BigDecimal refundAmount, String currency) { }
+
+    public record ReservationDecisionResponse(long reservationId, String status,
+                                              BigDecimal refundAmount, String currency) { }
 
     public record InvoiceResponse(long invoiceId, String invoiceNumber, String status, LocalDateTime issuedAt,
                                   long businessId, String businessName, String customerName, String customerEmail,

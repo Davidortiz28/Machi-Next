@@ -31,7 +31,7 @@
       title.append(heading, node("span", report.businessStatus === "ACTIVE" ? "Activo" : report.businessStatus, `business-status${report.businessStatus === "ACTIVE" ? "" : " inactive"}`));
       card.append(title);
       const metrics = node("div", null, "metric-grid");
-      const values = [[report.equipmentCount, "Equipos"], [report.availableEquipment, "Disponibles"], [report.maintenanceEquipment, "En mantenimiento"], [report.retiredEquipment, "Retirados"], [report.reservationCount, "Reservas totales"], [report.confirmedReservations, "Confirmadas"], [report.activeRentals, "Alquileres activos"], [report.completedRentals, "Alquileres finalizados"]];
+      const values = [[report.equipmentCount, "Equipos"], [report.availableEquipment, "Operativos"], [report.availableToday, "Disponibles hoy"], [report.maintenanceEquipment, "En mantenimiento"], [report.retiredEquipment, "Retirados"], [report.reservationCount, "Reservas totales"], [report.pendingProviderReservations, "Pendientes del proveedor"], [report.confirmedReservations, "Confirmadas"], [report.activeRentals, "Alquileres activos"], [report.completedRentals, "Alquileres finalizados"]];
       for (const [value, label] of values) { const metric = node("div", null, "metric"); metric.append(node("strong", String(value)), node("span", label)); metrics.append(metric); }
       card.append(metrics);
       const income = node("section", null, "money-section"); income.append(node("h3", "Ingresos de renta simulados"));

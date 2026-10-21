@@ -7,7 +7,7 @@ import java.util.List;
 
 public interface EquipmentCatalogPort {
 
-    List<CatalogItem> findCurrentCatalog();
+    List<CatalogItem> findCurrentCatalog(String search, String category);
 
-    List<CatalogItem> findAvailable(RentalPeriod period);
+    List<CatalogItem> findAvailable(RentalPeriod period, String search, String category);
 }

@@ -1,6 +1,7 @@
 package com.machinext.reservation.adapter.in.web;
 
 import com.machinext.reservation.application.ReservationService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -11,6 +12,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/provider/rentals")
+@SecurityRequirement(name = "bearerAuth")
 public class ProviderRentalController {
     private final ReservationService reservationService;
 
@@ -22,4 +24,5 @@ public class ProviderRentalController {
     public List<ReservationService.ProviderRentalResponse> list(@AuthenticationPrincipal Jwt jwt) {
         return reservationService.listForProvider(Long.parseLong(jwt.getSubject()));
     }
+
 }

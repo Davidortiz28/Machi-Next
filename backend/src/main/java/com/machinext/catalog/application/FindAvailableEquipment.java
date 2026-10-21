@@ -16,8 +16,8 @@ public class FindAvailableEquipment {
         this.equipmentCatalog = equipmentCatalog;
     }
 
-    public List<AvailableEquipment> execute(RentalPeriod period) {
-        return equipmentCatalog.findAvailable(period).stream()
+    public List<AvailableEquipment> execute(RentalPeriod period, String search, String category) {
+        return equipmentCatalog.findAvailable(period, search, category).stream()
                 .map(equipment -> new AvailableEquipment(equipment, RentalQuote.forPeriod(period, equipment)))
                 .toList();
     }

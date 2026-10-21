@@ -158,3 +158,16 @@ La gestión de cuentas y transferencias está en `/admin-accounts.html`, accesib
 ## Arquitectura
 
 El paquete base solo contiene el punto de entrada de Spring Boot. Los módulos de negocio se añadirán por contexto (`identity`, `businesses`, `catalog`, `rentals`, `payments` y `reports`), separando dominio y aplicación de los adaptadores web y de persistencia. Así las reglas de negocio no dependerán de Spring MVC ni de JPA.
+## Additional backend functions
+
+- `POST /api/v1/reservations` creates a request in `PENDING_PROVIDER`, records simulated charges, and creates a pending academic receipt. The requested dates are blocked while the provider decides.
+- `POST /api/v1/provider/reservations/{reservationId}/decision` accepts `{"decision":"ACCEPT"}` or `{"decision":"REJECT"}`. Only the provider currently assigned to the business can decide, and the decision is recorded. Accepting confirms the reservation and issues the receipt. Rejecting releases the dates, cancels the receipt, and records a simulated 100% refund.
+- Customers can cancel pending requests or accepted reservations. `GET /api/v1/reservations/history` includes handover, return, condition and refund information; `GET /api/v1/reservations/payments` lists the customer's simulated payment operations.
+- `PUT /api/v1/provider/equipment/{equipmentId}` edits equipment identity before it has reservation history. `PUT /api/v1/provider/equipment/{equipmentId}/rate` adds a dated price while keeping prior prices. Equipment with active requests, reservations or rentals cannot be paused or retired.
+- `GET /api/v1/provider/financial-history/payments` and `/invoices` show records for the provider's current business.
+- `GET /api/v1/admin/users`, `PATCH /api/v1/admin/users/{userId}/status`, and `GET /api/v1/admin/rentals` provide account and rental history administration. The last active administrator cannot be deactivated.
+- `GET /api/v1/admin/financial-history/payments`, `/invoices`, and `/api/v1/admin/reports/overview` provide global financial and operations summaries.
+- Catalog and availability requests accept optional `search` and `category` filters.
+- Swagger UI: `http://localhost:8080/swagger-ui.html`. OpenAPI JSON: `/v3/api-docs`. Set allowed browser origins with `CORS_ALLOWED_ORIGINS`.
+
+Payment operations remain academic simulations; no real payment gateway is connected.

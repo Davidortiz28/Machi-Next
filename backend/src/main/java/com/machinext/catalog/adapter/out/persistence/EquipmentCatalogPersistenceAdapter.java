@@ -17,13 +17,13 @@ public class EquipmentCatalogPersistenceAdapter implements EquipmentCatalogPort 
     }
 
     @Override
-    public List<CatalogItem> findCurrentCatalog() {
-        return repository.findCurrentCatalog().stream().map(this::toDomain).toList();
+    public List<CatalogItem> findCurrentCatalog(String search, String category) {
+        return repository.findCurrentCatalog(search, category).stream().map(this::toDomain).toList();
     }
 
     @Override
-    public List<CatalogItem> findAvailable(RentalPeriod period) {
-        return repository.findAvailable(period.startDate(), period.returnDate()).stream()
+    public List<CatalogItem> findAvailable(RentalPeriod period, String search, String category) {
+        return repository.findAvailable(period.startDate(), period.returnDate(), search, category).stream()
                 .map(this::toDomain)
                 .toList();
     }

@@ -2,6 +2,7 @@ package com.machinext.identity.adapter.in.web;
 
 import com.machinext.identity.application.AdminService;
 import com.machinext.identity.application.ProviderTransferService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -14,6 +15,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,6 +26,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/admin")
+@SecurityRequirement(name = "bearerAuth")
 public class AdminController {
     private final AdminService adminService;
     private final ProviderTransferService transferService;
@@ -38,6 +41,21 @@ public class AdminController {
 
     @GetMapping("/providers")
     public List<AdminService.ProviderAccountSummary> providers() { return adminService.listProviders(); }
+
+    @GetMapping("/users")
+    public List<AdminService.UserAccountSummary> users() { return adminService.listUsers(); }
+
+    @PatchMapping("/users/{userId}/status")
+    public AdminService.UserAccountSummary updateUserStatus(@AuthenticationPrincipal Jwt jwt,
+            @PathVariable long userId, @Valid @RequestBody UpdateUserStatusRequest request) {
+        return adminService.updateUserStatus(Long.parseLong(jwt.getSubject()), userId, request.status());
+    }
+
+    @GetMapping("/rentals")
+    public List<AdminService.AdminRentalSummary> rentals() { return adminService.listRentalHistory(); }
+
+    @GetMapping("/reports/overview")
+    public AdminService.AdminOverview overview() { return adminService.reportOverview(); }
 
     @PostMapping("/providers")
     @ResponseStatus(HttpStatus.CREATED)
@@ -86,4 +104,6 @@ public class AdminController {
                                                @NotBlank @Size(min = 12, max = 72) String password,
                                                @NotBlank @Size(max = 160) String displayName,
                                                @NotNull @Positive Long businessId) { }
+
+    public record UpdateUserStatusRequest(@NotBlank @jakarta.validation.constraints.Pattern(regexp = "ACTIVE|INACTIVE|LOCKED") String status) { }
 }

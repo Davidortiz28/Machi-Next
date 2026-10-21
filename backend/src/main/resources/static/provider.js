@@ -43,7 +43,31 @@
           catch (error) { status.textContent = error.message; select.value = item.operationalStatus; }
           finally { select.disabled = false; }
         });
-        card.append(info, select); list.append(card);
+        const rateDetails = document.createElement("details"); rateDetails.className = "rate-editor";
+        const rateSummary = node("summary", "Actualizar tarifa");
+        const rateForm = document.createElement("form");
+        const daily = document.createElement("input"); daily.type = "number"; daily.min = "0"; daily.step = "0.01"; daily.required = true; daily.value = item.dailyAmount;
+        daily.setAttribute("aria-label", "Nueva tarifa diaria");
+        const deposit = document.createElement("input"); deposit.type = "number"; deposit.min = "0"; deposit.step = "0.01"; deposit.required = true; deposit.value = item.depositAmount;
+        deposit.setAttribute("aria-label", "Nuevo depósito");
+        const validFrom = document.createElement("input"); validFrom.type = "date"; validFrom.required = true;
+        const suggestedDate = new Date(); suggestedDate.setDate(suggestedDate.getDate() + 1);
+        validFrom.value = suggestedDate.toLocaleDateString("en-CA");
+        const saveRate = node("button", "Guardar tarifa", "button button-outline"); saveRate.type = "submit";
+        rateForm.append(node("label", "Tarifa diaria"), daily, node("label", "Depósito"), deposit,
+          node("label", "Vigente desde"), validFrom, saveRate);
+        rateForm.addEventListener("submit", async (event) => {
+          event.preventDefault(); saveRate.disabled = true;
+          try {
+            await api(`/api/v1/provider/equipment/${item.equipmentId}/rate`, { method: "PUT", body: JSON.stringify({
+              dailyAmount: Number(daily.value), depositAmount: Number(deposit.value), currency: item.currency || "COP", validFrom: validFrom.value
+            }) });
+            formMessage.textContent = "La nueva tarifa quedó registrada con su fecha de vigencia.";
+            await loadInventory();
+          } catch (error) { rentalsStatus.textContent = error.message; saveRate.disabled = false; }
+        });
+        rateDetails.append(rateSummary, rateForm);
+        card.append(info, select, rateDetails); list.append(card);
       }
     } catch (error) { status.textContent = error.message; }
   };
@@ -61,7 +85,22 @@
         info.append(node("p", `Cliente: ${rental.customerName} · Equipo #${rental.equipmentId}`));
         info.append(node("p", `${rental.startDate} → ${rental.returnDate} · ${rental.calendarDays} días · ${rental.status}`));
         info.append(node("p", `Renta ${money(rental.rentalAmount, rental.currency)} · Depósito ${money(rental.depositAmount, rental.currency)}`));
-        if (rental.status === "CONFIRMED") {
+        if (rental.status === "PENDING_PROVIDER") {
+          const decisions = node("div", null, "provider-actions");
+          for (const [decision, label, style] of [["ACCEPT", "Aceptar solicitud", "button button-primary"], ["REJECT", "Rechazar", "button button-outline"]]) {
+            const button = node("button", label, style); button.type = "button";
+            button.addEventListener("click", async () => {
+              button.disabled = true;
+              try {
+                const result = await api(`/api/v1/provider/reservations/${rental.reservationId}/decision`, { method: "POST", body: JSON.stringify({ decision }) });
+                rentalsStatus.textContent = result.status === "REJECTED" ? `Solicitud rechazada. Reembolso simulado: ${money(result.refundAmount, result.currency)}.` : "Solicitud aceptada.";
+                await loadRentals();
+              } catch (error) { rentalsStatus.textContent = error.message; button.disabled = false; }
+            });
+            decisions.append(button);
+          }
+          card.append(info, decisions);
+        } else if (rental.status === "CONFIRMED") {
           const handover = node("button", "Registrar entrega", "button button-primary");
           handover.type = "button";
           handover.addEventListener("click", async () => {

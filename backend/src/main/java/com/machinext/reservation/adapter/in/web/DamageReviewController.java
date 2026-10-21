@@ -1,6 +1,7 @@
 package com.machinext.reservation.adapter.in.web;
 
 import com.machinext.reservation.adapter.out.storage.DamageEvidenceStorage;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import com.machinext.reservation.application.ReservationService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
@@ -28,6 +29,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/admin/damage-reports")
+@SecurityRequirement(name = "bearerAuth")
 public class DamageReviewController {
     private final ReservationService reservationService;
     private final DamageEvidenceStorage evidenceStorage;
