@@ -42,7 +42,16 @@
       const deposits = node("section", null, "money-section"); deposits.append(node("h3", "Depósitos pendientes"));
       if (report.pendingDepositsByCurrency.length) deposits.append(table(["Moneda", "Monto pendiente"], report.pendingDepositsByCurrency.map((row) => [row.currency, money(row.pendingDeposits, row.currency)])));
       else deposits.append(node("p", "No hay depósitos pendientes de liquidación."));
-      card.append(deposits); container.append(card);
+      card.append(deposits);
+      const rankings = node("div", null, "ranking-grid");
+      const equipment = node("section", null, "money-section"); equipment.append(node("h3", "Equipos más alquilados"));
+      if (report.mostRentedEquipment.length) equipment.append(table(["Equipo", "Alquileres"], report.mostRentedEquipment.map((row) => [`${row.manufacturer} ${row.modelName} (#${row.equipmentId})`, String(row.rentalCount)])));
+      else equipment.append(node("p", "Aún no hay equipos alquilados."));
+      const customers = node("section", null, "money-section"); customers.append(node("h3", "Clientes frecuentes"));
+      if (report.frequentCustomers.length) customers.append(table(["Cliente", "Alquileres"], report.frequentCustomers.map((row) => [row.displayName, String(row.rentalCount)])));
+      else customers.append(node("p", "Aún no hay clientes con alquileres registrados."));
+      rankings.append(equipment, customers); card.append(rankings);
+      container.append(card);
     }
   };
 

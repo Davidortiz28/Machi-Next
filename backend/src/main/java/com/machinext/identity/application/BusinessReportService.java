@@ -48,7 +48,8 @@ public class BusinessReportService {
                 business.businessStatus(), business.equipmentCount(), business.availableEquipment(),
                 business.maintenanceEquipment(), business.retiredEquipment(), business.reservationCount(),
                 business.confirmedReservations(), business.activeRentals(), business.completedRentals(),
-                listRentIncome(business.businessId()), listPendingDeposits(business.businessId()))).toList();
+                listRentIncome(business.businessId()), listPendingDeposits(business.businessId()),
+                listMostRentedEquipment(business.businessId()), listFrequentCustomers(business.businessId()))).toList();
     }
 
     private List<RentIncomeByCurrency> listRentIncome(long businessId) {
@@ -82,6 +83,37 @@ public class BusinessReportService {
                 rs.getBigDecimal("pending_deposits")), businessId);
     }
 
+    private List<EquipmentRentalCount> listMostRentedEquipment(long businessId) {
+        return jdbc.query("""
+                SELECT eu.equipment_id, em.manufacturer, em.model_name, COUNT(re.rental_id) AS rental_count
+                FROM rental re
+                JOIN reservation_item ri ON ri.reservation_item_id = re.reservation_item_id
+                JOIN reservation r ON r.reservation_id = ri.reservation_id
+                JOIN equipment_unit eu ON eu.equipment_id = ri.equipment_id
+                JOIN equipment_model em ON em.model_id = eu.model_id
+                WHERE r.business_id = ?
+                GROUP BY eu.equipment_id, em.manufacturer, em.model_name
+                ORDER BY rental_count DESC, em.manufacturer, em.model_name, eu.equipment_id
+                LIMIT 10
+                """, (rs, row) -> new EquipmentRentalCount(rs.getLong("equipment_id"),
+                rs.getString("manufacturer"), rs.getString("model_name"), rs.getLong("rental_count")), businessId);
+    }
+
+    private List<FrequentCustomer> listFrequentCustomers(long businessId) {
+        return jdbc.query("""
+                SELECT u.display_name, COUNT(DISTINCT r.reservation_id) AS rental_count
+                FROM reservation r
+                JOIN app_user u ON u.user_id = r.customer_user_id
+                JOIN reservation_item ri ON ri.reservation_id = r.reservation_id
+                JOIN rental re ON re.reservation_item_id = ri.reservation_item_id
+                WHERE r.business_id = ?
+                GROUP BY u.user_id, u.display_name
+                ORDER BY rental_count DESC, u.display_name
+                LIMIT 10
+                """, (rs, row) -> new FrequentCustomer(rs.getString("display_name"),
+                rs.getLong("rental_count")), businessId);
+    }
+
     private record BusinessMetrics(long businessId, String businessName, String businessStatus,
                                    long equipmentCount, long availableEquipment, long maintenanceEquipment,
                                    long retiredEquipment, long reservationCount, long confirmedReservations,
@@ -92,10 +124,17 @@ public class BusinessReportService {
                                  long retiredEquipment, long reservationCount, long confirmedReservations,
                                  long activeRentals, long completedRentals,
                                  List<RentIncomeByCurrency> rentIncomeByCurrency,
-                                 List<DepositBalanceByCurrency> pendingDepositsByCurrency) { }
+                                 List<DepositBalanceByCurrency> pendingDepositsByCurrency,
+                                 List<EquipmentRentalCount> mostRentedEquipment,
+                                 List<FrequentCustomer> frequentCustomers) { }
 
     public record RentIncomeByCurrency(String currency, BigDecimal rentCharged,
                                        BigDecimal rentRefunded, BigDecimal netRentIncome) { }
 
     public record DepositBalanceByCurrency(String currency, BigDecimal pendingDeposits) { }
+
+    public record EquipmentRentalCount(long equipmentId, String manufacturer, String modelName,
+                                       long rentalCount) { }
+
+    public record FrequentCustomer(String displayName, long rentalCount) { }
 }
