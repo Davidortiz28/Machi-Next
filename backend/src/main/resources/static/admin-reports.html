@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#173b35">
+  <title>Reportes globales · Machi Next</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/admin-reports.css">
+  <script src="/admin-reports.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/">Machi<span>Next</span></a>
+    <nav class="top-actions" aria-label="Navegación administrativa">
+      <a class="nav-link" href="/admin.html">Revisar daños</a>
+      <a class="nav-link" href="/admin-accounts.html">Usuarios y negocios</a>
+      <a class="nav-link" href="/">Catálogo</a>
+    </nav>
+  </header>
+  <main class="admin-reports-main">
+    <section class="admin-reports-heading">
+      <p class="eyebrow">ADMINISTRACIÓN GLOBAL</p>
+      <h1>Reportes de la plataforma</h1>
+      <p>Consulta el inventario, los ingresos simulados y la actividad general de Machi Next.</p>
+      <div class="reports-toolbar">
+        <p id="overview-status" role="status" aria-live="polite">Cargando resumen…</p>
+        <button id="refresh-overview" class="button button-outline" type="button">Actualizar</button>
+      </div>
+    </section>
+    <section id="overview-content" class="overview-content" aria-live="polite"></section>
+  </main>
+</body>
+</html>
