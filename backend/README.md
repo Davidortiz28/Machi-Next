@@ -166,6 +166,7 @@ El paquete base solo contiene el punto de entrada de Spring Boot. Los módulos d
 - `PUT /api/v1/provider/equipment/{equipmentId}` edits equipment identity before it has reservation history. `PUT /api/v1/provider/equipment/{equipmentId}/rate` adds a dated price while keeping prior prices. Equipment with active requests, reservations or rentals cannot be paused or retired.
 - `GET /api/v1/provider/financial-history/payments` and `/invoices` show records for the provider's current business.
 - `GET /api/v1/admin/users`, `PATCH /api/v1/admin/users/{userId}/status`, and `GET /api/v1/admin/rentals` provide account and rental history administration. The last active administrator cannot be deactivated.
+- The global administrator can browse and filter rental history by reservation status, customer, business, or equipment at `/admin-rentals.html`.
 - `GET /api/v1/admin/financial-history/payments`, `/invoices`, and `/api/v1/admin/reports/overview` provide global financial and operations summaries.
 - Catalog and availability requests accept optional `search` and `category` filters.
 - Swagger UI: `http://localhost:8080/swagger-ui.html`. OpenAPI JSON: `/v3/api-docs`. Set allowed browser origins with `CORS_ALLOWED_ORIGINS`.
