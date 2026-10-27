@@ -1,6 +1,7 @@
 package com.machinext.identity.adapter.in.web;
 
 import com.machinext.identity.application.AuthService;
+import com.machinext.identity.application.AdminLaunchService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -16,9 +17,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/auth")
 public class AuthController {
     private final AuthService authService;
+    private final AdminLaunchService adminLaunchService;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, AdminLaunchService adminLaunchService) {
         this.authService = authService;
+        this.adminLaunchService = adminLaunchService;
     }
 
     @PostMapping("/register")
@@ -30,6 +33,16 @@ public class AuthController {
     @PostMapping("/login")
     public AuthService.AuthResponse login(@Valid @RequestBody LoginRequest request) {
         return authService.login(request.email(), request.password());
+    }
+
+    @PostMapping("/admin-launch")
+    public AdminLaunchService.LaunchCode createAdminLaunch(@Valid @RequestBody LoginRequest request) {
+        return adminLaunchService.create(request.email(), request.password());
+    }
+
+    @PostMapping("/admin-launch/consume")
+    public AuthService.AuthResponse consumeAdminLaunch(@Valid @RequestBody ConsumeAdminLaunchRequest request) {
+        return adminLaunchService.consume(request.code());
     }
 
     @PostMapping("/bootstrap-admin")
@@ -44,6 +57,8 @@ public class AuthController {
 
     public record LoginRequest(@NotBlank @Email @Size(max = 254) String email,
                                @NotBlank String password) { }
+
+    public record ConsumeAdminLaunchRequest(@NotBlank @Size(max = 64) String code) { }
 
     public record BootstrapAdminRequest(@NotBlank @Email @Size(max = 254) String email,
                                         @NotBlank @Size(min = 12, max = 72) String password,

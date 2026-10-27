@@ -172,3 +172,7 @@ El paquete base solo contiene el punto de entrada de Spring Boot. Los módulos d
 - Swagger UI: `http://localhost:8080/swagger-ui.html`. OpenAPI JSON: `/v3/api-docs`. Set allowed browser origins with `CORS_ALLOWED_ORIGINS`.
 
 Payment operations remain academic simulations; no real payment gateway is connected.
+
+## Abrir el panel de administración en Windows
+
+Haz doble clic en `Abrir Panel Admin.bat` para iniciar el entorno y abrir `/admin-accounts.html` con la cuenta administrativa de demostración. El lanzador lee `ADMIN_EMAIL` y `ADMIN_PASSWORD` de `.env.demo.local`; ese archivo es local y está excluido de Git. El código temporal dura 60 segundos y solo se puede canjear una vez. La sesión queda guardada solo en esa pestaña del navegador.

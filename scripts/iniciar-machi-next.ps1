@@ -1,4 +1,6 @@
-﻿$ErrorActionPreference = 'Stop'
+﻿param([switch]$NoBrowser)
+
+$ErrorActionPreference = 'Stop'
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $backendDir = Join-Path $repoRoot 'backend'
@@ -33,13 +35,13 @@ $latestSource = Get-ChildItem (Join-Path $backendDir 'src\main') -Recurse -File 
     Sort-Object LastWriteTime -Descending | Select-Object -First 1
 $sourceIsNewer = $latestSource -and (!(Test-Path $jarPath) -or $latestSource.LastWriteTime -gt (Get-Item $jarPath).LastWriteTime)
 
-if (Test-AppHealth -and !$sourceIsNewer) {
+if ((Test-AppHealth) -and (-not $sourceIsNewer)) {
     Write-Host 'El backend ya estaba iniciado y actualizado.'
-    Start-Process $appUrl
+    if (!$NoBrowser) { Start-Process $appUrl }
     exit 0
 }
 
-if (Test-AppHealth -and $sourceIsNewer) {
+if ((Test-AppHealth) -and $sourceIsNewer) {
     Write-Host 'Hay cambios nuevos. Reiniciando el backend para aplicarlos...'
     $listener = Get-NetTCPConnection -LocalPort 8081 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($listener) {
@@ -135,4 +137,4 @@ if (!$appReady) {
 }
 
 Write-Host 'Machi Next esta listo. Abriendo el navegador...'
-Start-Process $appUrl
+if (!$NoBrowser) { Start-Process $appUrl }
