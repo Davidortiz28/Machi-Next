@@ -19,8 +19,12 @@ function Test-AppHealth {
 }
 
 function Test-DockerEngine {
+    $previousPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
     docker info *> $null
-    return $LASTEXITCODE -eq 0
+    $available = $LASTEXITCODE -eq 0
+    $ErrorActionPreference = $previousPreference
+    return $available
 }
 
 Write-Host 'Iniciando Machi Next...'
