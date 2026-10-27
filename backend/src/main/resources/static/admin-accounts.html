@@ -16,12 +16,12 @@
     <div id="accounts-content" hidden>
       <section class="accounts-panel"><h2>Crear proveedor</h2><form id="provider-form" class="accounts-form">
         <label>Nombre<input name="displayName" maxlength="160" required></label><label>Correo<input name="email" type="email" maxlength="254" required></label>
-        <label>Contraseña inicial<input name="password" type="password" minlength="12" maxlength="72" autocomplete="new-password" required></label><label>Negocio<input name="businessId" list="business-options" required placeholder="Selecciona un negocio activo"></label>
+        <label>Contraseña inicial<input name="password" type="password" minlength="12" maxlength="72" autocomplete="new-password" required><small>Se permiten símbolos como ! @ # $ % &amp; *</small></label><label>Negocio<input name="businessId" list="business-options" required placeholder="Selecciona un negocio activo"></label>
         <datalist id="business-options"></datalist><div class="wide"><button class="button button-primary" type="submit">Crear proveedor</button><span class="form-status" role="status"></span></div>
       </form></section>
       <section class="accounts-panel"><h2>Crear representante de negocio</h2><form id="manager-form" class="accounts-form">
         <label>Nombre<input name="displayName" maxlength="160" required></label><label>Correo<input name="email" type="email" maxlength="254" required></label>
-        <label>Contraseña inicial<input name="password" type="password" minlength="12" maxlength="72" autocomplete="new-password" required></label><label>Negocio<input name="businessId" list="business-options" required placeholder="Selecciona un negocio activo"></label>
+        <label>Contraseña inicial<input name="password" type="password" minlength="12" maxlength="72" autocomplete="new-password" required><small>Se permiten símbolos como ! @ # $ % &amp; *</small></label><label>Negocio<input name="businessId" list="business-options" required placeholder="Selecciona un negocio activo"></label>
         <div class="wide"><button class="button button-primary" type="submit">Crear representante</button><span class="form-status" role="status"></span></div>
       </form></section>
       <section class="accounts-panel"><div class="panel-heading"><div><h2>Proveedores</h2><p>Elige uno con asignación vigente para iniciar una transferencia.</p></div><button id="refresh-data" class="button button-outline" type="button">Actualizar</button></div><div id="provider-list" class="provider-list"></div></section>

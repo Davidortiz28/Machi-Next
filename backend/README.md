@@ -26,7 +26,7 @@ El endpoint de salud es una herramienta operativa de Spring Actuator, no una fun
 
 - `POST /api/v1/auth/register` crea una cuenta activa con rol `CLIENTE` y devuelve un JWT.
 - `POST /api/v1/auth/login` valida correo y contraseña y devuelve un JWT.
-- Las contraseñas se guardan con BCrypt. Los tokens son Bearer, firmados con HS256 y duran 60 minutos por defecto.
+- Las contraseñas aceptan letras, números y símbolos (por ejemplo `!@#$%&*`) y se guardan con BCrypt. Los tokens son Bearer, firmados con HS256 y duran 60 minutos por defecto.
 - Catálogo y salud son públicos. Las demás rutas requieren `Authorization: Bearer <accessToken>`.
 - El registro normal nunca permite elegir rol. Las cuentas de demostración inactivas no pueden iniciar sesión.
 
@@ -169,7 +169,17 @@ El paquete base solo contiene el punto de entrada de Spring Boot. Los módulos d
 - The global administrator can browse and filter rental history by reservation status, customer, business, or equipment at `/admin-rentals.html`.
 - `GET /api/v1/admin/financial-history/payments`, `/invoices`, and `/api/v1/admin/reports/overview` provide global financial and operations summaries.
 - Catalog and availability requests accept optional `search` and `category` filters.
-- Swagger UI: `http://localhost:8080/swagger-ui.html`. OpenAPI JSON: `/v3/api-docs`. Set allowed browser origins with `CORS_ALLOWED_ORIGINS`.
+- Swagger UI: `http://localhost:8081/swagger-ui.html` cuando se inicia con el lanzador `Abrir Machi Next`; OpenAPI JSON: `http://localhost:8081/v3/api-docs`. Si ejecutas Maven directamente sin cambiar el puerto, sustituye `8081` por `8080`. Set allowed browser origins with `CORS_ALLOWED_ORIGINS`.
+
+### Probar la API desde Swagger
+
+1. Inicia Machi Next con `Abrir Machi Next` y abre [Swagger UI](http://localhost:8081/swagger-ui.html) en el mismo equipo. La página `/v3/api-docs` muestra el documento OpenAPI en JSON.
+2. Busca `POST /api/v1/auth/login`, pulsa **Try it out** y envía un JSON con tu correo y contraseña. Los símbolos como `!`, `$`, `&` o `#` se escriben normalmente dentro del valor JSON; si la contraseña contiene comillas dobles o barras invertidas, hay que escaparlas según JSON.
+3. Copia el valor de `accessToken` de la respuesta, sin añadir `Bearer `.
+4. Pulsa **Authorize** arriba, pega el token y confirma. Swagger añadirá `Authorization: Bearer <token>` a las operaciones que requieren sesión. Usa una cuenta con el rol adecuado para cada operación; iniciar sesión no concede permisos de administrador.
+5. Abre el endpoint deseado, pulsa **Try it out**, completa parámetros o cuerpo y pulsa **Execute**. Las respuestas y códigos HTTP aparecerán debajo.
+
+El token dura 60 minutos por defecto. Pulsa **Logout** en **Authorize** o vuelve a iniciar sesión para renovar la sesión. Catálogo, salud e inicio de sesión son públicos; las rutas protegidas se identifican con el candado de Swagger.
 
 Payment operations remain academic simulations; no real payment gateway is connected.
 
