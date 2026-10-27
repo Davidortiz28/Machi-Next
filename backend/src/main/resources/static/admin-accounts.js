@@ -6,8 +6,14 @@
   const providerList = document.querySelector("#provider-list");
   const transferList = document.querySelector("#transfer-list");
   const transferStatus = document.querySelector("#transfer-list-status");
+  const userList = document.querySelector("#user-list");
+  const userListStatus = document.querySelector("#user-list-status");
+  const accountSearch = document.querySelector("#account-search");
+  const accountStatusFilter = document.querySelector("#account-status-filter");
+  const accountRoleFilter = document.querySelector("#account-role-filter");
   let businesses = [];
   let providers = [];
+  let users = [];
 
   const api = async (path, options = {}) => {
     const headers = new Headers(options.headers || {}); headers.set("Authorization", `Bearer ${token}`);
@@ -21,6 +27,54 @@
   const businessName = (id) => businesses.find((business) => business.businessId === Number(id))?.legalName || `Negocio #${id}`;
   const formatDate = (value) => value ? new Date(value).toLocaleString("es-CO") : "—";
   const stateLabel = (value) => ({ PENDING: "Pendiente de aprobación", WAITING: "En periodo de espera", REJECTED: "Rechazada", COMPLETED: "Completada" })[value] || value;
+  const accountStatusLabel = (value) => ({ ACTIVE: "Activa", INACTIVE: "Inactiva", LOCKED: "Bloqueada" })[value] || value;
+  const roleLabel = (value) => ({ ADMIN: "Administrador", BUSINESS_ADMIN: "Representante", PROVEEDOR: "Proveedor", CLIENTE: "Cliente" })[value] || value;
+
+  const renderUsers = () => {
+    if (!userList) return;
+    const query = accountSearch.value.trim().toLocaleLowerCase("es-CO");
+    const matching = users.filter((account) => {
+      const roles = (account.roles || "").split(",").filter(Boolean);
+      const text = [account.userId, account.displayName, account.email, ...roles].join(" ").toLocaleLowerCase("es-CO");
+      return (!query || text.includes(query)) && (!accountStatusFilter.value || account.accountStatus === accountStatusFilter.value)
+        && (!accountRoleFilter.value || roles.includes(accountRoleFilter.value));
+    });
+    userListStatus.textContent = `${matching.length} de ${users.length} cuentas`;
+    userList.replaceChildren();
+    if (!matching.length) { userList.append(element("p", users.length ? "No hay cuentas que coincidan con los filtros." : "Todavía no hay cuentas.", "empty-state")); return; }
+    for (const account of matching) {
+      const row = element("article", null, "account-row");
+      const details = element("div", null, "account-details");
+      const roles = (account.roles || "").split(",").filter(Boolean);
+      details.append(element("strong", `${account.displayName} · #${account.userId}`));
+      details.append(element("p", account.email));
+      details.append(element("p", roles.map(roleLabel).join(" · ") || "Sin rol"));
+      details.append(element("p", `Creada: ${formatDate(account.createdAt)}`));
+      row.append(details);
+      const controls = element("form", null, "account-status-form");
+      const select = document.createElement("select");
+      select.setAttribute("aria-label", `Estado de ${account.displayName}`);
+      for (const state of ["ACTIVE", "INACTIVE", "LOCKED"]) {
+        const option = element("option", accountStatusLabel(state)); option.value = state; option.selected = state === account.accountStatus; select.append(option);
+      }
+      const save = element("button", "Guardar", "button button-outline"); save.type = "submit"; save.disabled = true;
+      const message = element("span", accountStatusLabel(account.accountStatus), "account-action-status"); message.setAttribute("role", "status");
+      select.addEventListener("change", () => { save.disabled = select.value === account.accountStatus; });
+      controls.append(select, save, message);
+      controls.addEventListener("submit", async (event) => {
+        event.preventDefault(); save.disabled = true; select.disabled = true; message.textContent = "Guardando…";
+        try {
+          const updated = await api(`/api/v1/admin/users/${account.userId}/status`, { method: "PATCH", body: JSON.stringify({ status: select.value }) });
+          users = users.map((item) => item.userId === updated.userId ? updated : item);
+          message.textContent = `Estado actualizado: ${accountStatusLabel(updated.accountStatus)}`;
+          renderUsers();
+        } catch (error) { message.textContent = error.message; select.disabled = false; save.disabled = select.value === account.accountStatus; }
+      });
+      row.append(controls); userList.append(row);
+    }
+  };
+
+  const loadUsers = async () => { users = await api("/api/v1/admin/users"); renderUsers(); };
 
   const loadBusinesses = async () => {
     businesses = await api("/api/v1/admin/businesses");
@@ -74,7 +128,7 @@
   };
 
   const refresh = async () => {
-    try { await Promise.all([loadBusinesses(), loadProviders(), loadTransfers()]); }
+    try { await Promise.all([loadBusinesses(), loadProviders(), loadTransfers(), loadUsers()]); }
     catch (error) { status.textContent = error.message; }
   };
 
@@ -105,6 +159,9 @@
       catch (error) { message.textContent = error.message; }
     });
     document.querySelector("#refresh-data").addEventListener("click", refresh);
+    accountSearch.addEventListener("input", renderUsers);
+    accountStatusFilter.addEventListener("change", renderUsers);
+    accountRoleFilter.addEventListener("change", renderUsers);
     refresh();
   }
 })();

@@ -11,7 +11,7 @@
 <body>
   <header class="site-header"><a class="brand" href="/">Machi<span>Next</span></a><nav class="top-actions"><a class="nav-link" href="/admin.html">Revisar daños</a><a class="nav-link" href="/">Volver al catálogo</a></nav></header>
   <main class="accounts-main">
-    <p><a class="button button-outline" href="/admin-reports.html">Reportes globales</a></p>
+    <p><a class="button button-outline" href="/admin-reports.html">Reportes globales</a> <a class="button button-outline" href="/admin-rentals.html">Historial de alquileres</a></p>
     <section class="accounts-heading"><p class="eyebrow">ADMINISTRACIÓN GLOBAL</p><h1>Negocios y proveedores</h1><p>Crea cuentas operativas y gestiona las transferencias de proveedores.</p><p id="accounts-status" role="status"></p></section>
     <div id="accounts-content" hidden>
       <section class="accounts-panel"><h2>Crear proveedor</h2><form id="provider-form" class="accounts-form">
@@ -25,6 +25,10 @@
         <div class="wide"><button class="button button-primary" type="submit">Crear representante</button><span class="form-status" role="status"></span></div>
       </form></section>
       <section class="accounts-panel"><div class="panel-heading"><div><h2>Proveedores</h2><p>Elige uno con asignación vigente para iniciar una transferencia.</p></div><button id="refresh-data" class="button button-outline" type="button">Actualizar</button></div><div id="provider-list" class="provider-list"></div></section>
+      <section class="accounts-panel"><div class="panel-heading"><div><h2>Cuentas de usuario</h2><p>Busca cuentas, filtra por estado y cambia su acceso.</p></div></div>
+        <div class="account-filters"><label>Buscar<input id="account-search" type="search" placeholder="Nombre, correo, rol o ID"></label><label>Estado<select id="account-status-filter"><option value="">Todos</option><option value="ACTIVE">Activas</option><option value="INACTIVE">Inactivas</option><option value="LOCKED">Bloqueadas</option></select></label><label>Rol<select id="account-role-filter"><option value="">Todos</option><option value="ADMIN">Administrador</option><option value="BUSINESS_ADMIN">Representante</option><option value="PROVEEDOR">Proveedor</option><option value="CLIENTE">Cliente</option></select></label></div>
+        <p id="user-list-status" class="user-list-status" role="status" aria-live="polite"></p><div id="user-list" class="user-list"></div>
+      </section>
       <section class="accounts-panel"><h2>Solicitar transferencia</h2><form id="transfer-form" class="accounts-form">
         <label>Proveedor<select name="providerUserId" required></select></label><label>Negocio de destino<select name="toBusinessId" required></select></label>
         <div class="wide"><button class="button button-primary" type="submit">Enviar solicitud</button><span id="transfer-form-status" class="form-status" role="status"></span></div>

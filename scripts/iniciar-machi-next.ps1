@@ -25,10 +25,28 @@ function Test-DockerEngine {
 
 Write-Host 'Iniciando Machi Next...'
 
-if (Test-AppHealth) {
-    Write-Host 'El backend ya estaba iniciado.'
+$latestSource = Get-ChildItem (Join-Path $backendDir 'src\main') -Recurse -File |
+    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+$sourceIsNewer = $latestSource -and (!(Test-Path $jarPath) -or $latestSource.LastWriteTime -gt (Get-Item $jarPath).LastWriteTime)
+
+if (Test-AppHealth -and !$sourceIsNewer) {
+    Write-Host 'El backend ya estaba iniciado y actualizado.'
     Start-Process $appUrl
     exit 0
+}
+
+if (Test-AppHealth -and $sourceIsNewer) {
+    Write-Host 'Hay cambios nuevos. Reiniciando el backend para aplicarlos...'
+    $listener = Get-NetTCPConnection -LocalPort 8081 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($listener) {
+        $process = Get-Process -Id $listener.OwningProcess -ErrorAction SilentlyContinue
+        if ($process -and $process.ProcessName -eq 'java') {
+            Stop-Process -Id $process.Id -Force
+            for ($attempt = 0; $attempt -lt 30 -and (Test-AppHealth); $attempt++) { Start-Sleep -Seconds 1 }
+        } else {
+            throw 'El puerto 8081 lo ocupa otro programa. Ciérralo antes de iniciar Machi Next.'
+        }
+    }
 }
 
 if (!(Test-DockerEngine)) {
@@ -84,9 +102,8 @@ foreach ($line in Get-Content $envPath) {
 $env:DB_PORT = $env:MYSQL_PORT
 $env:SERVER_PORT = '8081'
 
-$latestSource = Get-ChildItem (Join-Path $backendDir 'src\main') -Recurse -File |
-    Sort-Object LastWriteTime -Descending | Select-Object -First 1
-if (!(Test-Path $jarPath) -or ($latestSource -and $latestSource.LastWriteTime -gt (Get-Item $jarPath).LastWriteTime)) {
+if ($sourceIsNewer) {
+
     Write-Host 'Compilando el backend...'
     Push-Location $backendDir
     try {
